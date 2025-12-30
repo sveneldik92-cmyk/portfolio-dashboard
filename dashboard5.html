@@ -1,0 +1,2544 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Portfolio Dashboard</title>
+
+  <!-- Tailwind CSS via CDN (no build step) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js via CDN (no additional libraries) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji']
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    .drawer-transition { transition: transform 200ms ease-out; }
+    .mono { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 font-sans">
+  <div class="min-h-screen">
+    <!-- =========================================================
+      HEADER BAR
+      ========================================================= -->
+    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-200">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-5 py-4">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-blue-700 flex items-center justify-center shadow-sm">
+              <span class="text-white font-semibold tracking-wide">BI</span>
+            </div>
+            <div>
+              <div class="text-sm text-slate-500">Corporate Portfolio Overview</div>
+              <h1 class="text-lg sm:text-xl font-semibold leading-tight">Stock Portfolio Dashboard</h1>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div class="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
+              <span class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200">
+                Last updated: <span id="lastUpdated" class="ml-1 font-medium text-slate-700"></span>
+              </span>
+              <span id="dataPill" class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800">
+                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                Dummy data
+              </span>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <label class="text-xs text-slate-500" for="currencySelect">Currency</label>
+              <select id="currencySelect"
+                class="text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+                <option value="EUR" selected>EUR</option>
+                <option value="USD">USD</option>
+              </select>
+
+              <button id="benchmarkToggle"
+                class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                aria-pressed="true">
+                Benchmark: <span class="font-medium" id="benchmarkState">On</span>
+              </button>
+
+              <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                <button id="modeAbs"
+                  class="text-xs px-3 py-2 rounded-lg bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  aria-pressed="true">
+                  Absolute Value
+                </button>
+                <button id="modePct"
+                  class="text-xs px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  aria-pressed="false">
+                  % Performance
+                </button>
+              </div>
+
+              <button id="themeToggle"
+                class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Theme: <span class="font-medium" id="themeState">Light</span>
+              </button>
+
+              <button id="exportBtn"
+                class="text-sm px-3 py-2 rounded-xl bg-blue-700 text-white shadow-sm hover:bg-blue-600 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Date range slider: month-level dual range (up to 5Y) -->
+        <div class="mt-4 p-4 rounded-2xl border border-slate-200 bg-slate-50">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div>
+              <div class="text-xs text-slate-500">Date range (5Y timeline • month-level granularity)</div>
+              <div class="mt-1 text-sm font-semibold text-slate-800">
+                <span id="rangeLabelStart">—</span>
+                <span class="text-slate-400 font-medium mx-1">→</span>
+                <span id="rangeLabelEnd">—</span>
+              </div>
+              <div class="mt-1 text-xs text-slate-500">
+                In “% Performance” mode, every line is rebased to <span class="font-medium text-slate-700">0%</span> at the left edge.
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <button id="preset12m"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Last 12M
+              </button>
+              <button id="presetYTD"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                YTD
+              </button>
+              <button id="preset5y"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Full 5Y
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div class="md:col-span-6">
+              <div class="flex items-center justify-between">
+                <label for="startMonth" class="text-xs font-medium text-slate-600">Start</label>
+                <span class="text-xs text-slate-500 mono" id="startMonthVal">—</span>
+              </div>
+              <input id="startMonth" type="range" min="0" max="59" step="1" value="48" class="w-full accent-blue-700">
+            </div>
+
+            <div class="md:col-span-6">
+              <div class="flex items-center justify-between">
+                <label for="endMonth" class="text-xs font-medium text-slate-600">End</label>
+                <span class="text-xs text-slate-500 mono" id="endMonthVal">—</span>
+              </div>
+              <input id="endMonth" type="range" min="0" max="59" step="1" value="59" class="w-full accent-blue-700">
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- =========================================================
+      MAIN
+      ========================================================= -->
+    <main class="max-w-[1440px] mx-auto px-4 sm:px-5 py-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- LEFT / SIDEBAR -->
+        <aside class="lg:col-span-3 space-y-6">
+          <!-- =========================================================
+            REAL DATA (Transactions-only + Online Prices)
+            - Upload ONE file: transactions.csv
+            - Dashboard derives holdings (net BUY/SELL)
+            - Prices fetched online (Stooq CSV) via optional CORS proxy
+          ========================================================= -->
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Data (1-file workflow)</h2>
+              <p class="text-xs text-slate-500 mt-1">Upload <span class="font-medium">transactions.csv</span>. Holdings are derived; prices are fetched online (or fall back to synthetic if blocked).</p>
+            </div>
+
+            <div class="p-4 space-y-4">
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
+                <div class="font-semibold text-slate-700">transactions.csv expected columns</div>
+                <div class="mt-2">
+                  <div class="mono">Date, Ticker, Type, Quantity, Price, Fee, Currency</div>
+                  <div class="mt-1 text-[11px] text-slate-500">
+                    Type: BUY/SELL/DEPOSIT/WITHDRAW/DIV/FEE. For DEPOSIT/WITHDRAW/DIV/FEE use <span class="mono">Amount</span> (optional column). For BUY/SELL use Quantity+Price (Fee optional).
+                  </div>
+                </div>
+                <div class="mt-2">
+                  <div class="font-medium">Optional enrichment</div>
+                  <div class="mono mt-1">Name, Region (Americas/Europe/APAC/Other), Sector, Account, Notes</div>
+                </div>
+                <div class="mt-2">
+                  <div class="font-medium">Important</div>
+                  <div class="mt-1 text-[11px] text-slate-500">
+                    For best online prices, use Stooq-style symbols (examples: <span class="mono">AAPL.US</span>, <span class="mono">MSFT.US</span>, <span class="mono">ASML.NL</span>). Benchmark default is <span class="mono">^spx</span>.
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="txOnlyFile">Transactions CSV</label>
+                <input id="txOnlyFile" type="file" accept=".csv,text/csv"
+                  class="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:px-3 file:py-2 file:rounded-xl file:border file:border-slate-200 file:bg-white file:shadow-sm hover:file:bg-slate-50 focus:outline-none" />
+              </div>
+
+              <div class="grid grid-cols-1 gap-3">
+                <div>
+                  <label class="text-xs font-medium text-slate-600" for="proxyBase">CORS proxy base (optional)</label>
+                  <input id="proxyBase" type="text" value=""
+                    class="mt-1 w-full text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 mono"
+                    placeholder="https://YOUR-WORKER.workers.dev/cors?url=" />
+                  <div class="mt-1 text-[11px] text-slate-500">
+                    If direct fetch is blocked by CORS, use a proxy like a Cloudflare Worker that adds CORS headers.
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-xs font-medium text-slate-600" for="benchmarkSymbol">Benchmark symbol</label>
+                    <input id="benchmarkSymbol" type="text" value="^spx"
+                      class="mt-1 w-full text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 mono"
+                      placeholder="^spx" />
+                  </div>
+                  <div>
+                    <label class="text-xs font-medium text-slate-600" for="fxSymbol">FX symbol (EURUSD)</label>
+                    <input id="fxSymbol" type="text" value="eurusd"
+                      class="mt-1 w-full text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 mono"
+                      placeholder="eurusd" />
+                  </div>
+                </div>
+
+                <div class="flex gap-2">
+                  <button id="loadTxData"
+                    class="flex-1 text-sm px-3 py-2 rounded-xl bg-blue-700 text-white hover:bg-blue-600 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    Load Transactions
+                  </button>
+                  <button id="resetDummy"
+                    class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    Reset
+                  </button>
+                </div>
+
+                <div class="p-3 rounded-xl border border-slate-200 bg-white">
+                  <div class="text-[11px] text-slate-500">Status</div>
+                  <div id="loadStatus" class="mt-1 text-xs text-slate-700">Using built-in dummy dataset.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Filters -->
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Filters</h2>
+              <p class="text-xs text-slate-500 mt-1">Applies to KPIs, charts, and holdings.</p>
+            </div>
+
+            <div class="p-4 space-y-4">
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="accountSelect">Account</label>
+                <select id="accountSelect"
+                  class="mt-1 w-full text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+                  <option value="All" selected>All</option>
+                  <option value="Broker A">Broker A</option>
+                  <option value="Broker B">Broker B</option>
+                  <option value="Pension">Pension</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="sectorSelect">Sector</label>
+                <select id="sectorSelect"
+                  class="mt-1 w-full text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+                  <option value="All" selected>All</option>
+                  <option value="Technology">Technology</option>
+                  <option value="Semiconductors">Semiconductors</option>
+                  <option value="Financials">Financials</option>
+                  <option value="Consumer">Consumer</option>
+                  <option value="Staples">Staples</option>
+                  <option value="Healthcare">Healthcare</option>
+                  <option value="ETF">ETF</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600">Region (click donut)</label>
+                <div class="mt-1 flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div class="text-sm text-slate-700">
+                    <span class="text-slate-500">Selected:</span>
+                    <span class="font-medium" id="selectedRegionLabel">All</span>
+                  </div>
+                  <button id="clearRegion"
+                    class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <button id="applyFilters"
+                class="w-full text-sm px-3 py-2 rounded-xl bg-blue-700 text-white hover:bg-blue-600 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Apply Filters
+              </button>
+            </div>
+          </section>
+
+          <!-- Performance mini panel -->
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Performance</h2>
+              <p class="text-xs text-slate-500 mt-1">Computed from the selected window.</p>
+            </div>
+
+            <div class="p-4 grid grid-cols-2 gap-2">
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[11px] text-slate-500">Max Drawdown</div>
+                <div class="mt-1 text-sm font-semibold mono" id="perfDrawdown">—</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[11px] text-slate-500">Sharpe</div>
+                <div class="mt-1 text-sm font-semibold mono" id="perfSharpe">—</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[11px] text-slate-500">Beta (vs S&P 500)</div>
+                <div class="mt-1 text-sm font-semibold mono" id="perfBeta">—</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[11px] text-slate-500">Hit Rate (Sells)</div>
+                <div class="mt-1 text-sm font-semibold mono" id="perfHitRate">—</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Transactions mini-table -->
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Recent Transactions</h2>
+              <p class="text-xs text-slate-500 mt-1">Latest 5 buys/sells.</p>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="min-w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                  <tr class="text-left text-[11px] font-semibold text-slate-600">
+                    <th class="px-4 py-3">Date</th>
+                    <th class="px-4 py-3">Type</th>
+                    <th class="px-4 py-3">Ticker</th>
+                    <th class="px-4 py-3 text-right">Amount</th>
+                    <th class="px-4 py-3 text-right">P&L</th>
+                  </tr>
+                </thead>
+                <tbody id="txBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 text-xs text-slate-500">
+              Hit rate counts profitable sells (realized P&L from avg-cost method).
+            </div>
+          </section>
+        </aside>
+
+        <!-- RIGHT / CONTENT -->
+        <section class="lg:col-span-9 space-y-6">
+          <!-- KPI ROW 1 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="text-xs text-slate-500">Total Portfolio Value</div>
+              <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiTotalValue">—</div>
+              <div class="mt-3 flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-lg border" id="kpiValueDeltaBadge">—</span>
+                <span class="text-xs text-slate-500">vs prior day</span>
+              </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="text-xs text-slate-500">Cash Position</div>
+              <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiCash">—</div>
+              <div class="mt-3 flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 mono" id="kpiCashPct">—</span>
+                <span class="text-xs text-slate-500">of portfolio</span>
+              </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="text-xs text-slate-500">12M Volatility (ann.)</div>
+              <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiVolatility">—</div>
+              <div class="mt-3 flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-lg border mono" id="kpiVolDeltaBadge">—</span>
+                <span class="text-xs text-slate-500">Δ vs prior 12M</span>
+              </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="text-xs text-slate-500">Total Return (range)</div>
+              <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiTotalReturn">—</div>
+              <div class="mt-3 flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-lg border mono" id="kpiTotalDeltaBadge">—</span>
+                <span class="text-xs text-slate-500">Δ vs Benchmark</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI ROW 2 -->
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 class="text-sm font-semibold text-slate-800">Returns vs Benchmark</h2>
+                <p class="text-xs text-slate-500 mt-1">All metrics update with the selected date range and filters.</p>
+              </div>
+              <div class="text-xs text-slate-500">
+                Benchmark: <span class="font-medium text-slate-700" id="benchLabel">S&P 500</span>
+              </div>
+            </div>
+            <div class="p-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3" id="kpiReturnRow2"></div>
+            </div>
+          </div>
+
+          <!-- CHARTS -->
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Performance Over Time</h2>
+              <p class="text-xs text-slate-500 mt-1">
+                Absolute shows market value per series (currency) and benchmark as an index. % mode rebases everything to 0% at range start; line thickness encodes position size.
+              </p>
+            </div>
+
+            <div class="p-4 grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <div class="xl:col-span-8">
+                <div class="h-[340px] sm:h-[400px]">
+                  <canvas id="lineChart"></canvas>
+                </div>
+                <div class="mt-3 text-xs text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <span class="inline-flex items-center gap-2">
+                    <span class="inline-block h-2 w-2 rounded-full bg-blue-700"></span> Portfolio
+                  </span>
+                  <span class="inline-flex items-center gap-2">
+                    <span class="inline-block h-2 w-2 rounded-full bg-slate-500"></span> Holdings
+                  </span>
+                  <span class="inline-flex items-center gap-2">
+                    <span class="inline-block h-2 w-2 rounded-full bg-slate-400"></span> Benchmark (dashed)
+                  </span>
+                </div>
+              </div>
+
+              <div class="xl:col-span-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-sm font-semibold text-slate-800">Allocation by Region</h3>
+                    <p class="text-xs text-slate-500 mt-1">Click a segment to filter holdings (click again to reset).</p>
+                  </div>
+                  <button id="resetAllocation"
+                    class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    Reset
+                  </button>
+                </div>
+
+                <div class="mt-3 h-[260px] sm:h-[300px]">
+                  <canvas id="donutChart"></canvas>
+                </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600" id="donutLegend"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TABLE -->
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold text-slate-800">Top 10 Holdings</h2>
+                <p class="text-xs text-slate-500 mt-1">Search, sort, click a row for details.</p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <div class="relative">
+                  <input id="searchHoldings" type="text" placeholder="Search holdings…"
+                    class="text-sm bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 w-44 sm:w-56" />
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">⌕</span>
+                </div>
+
+                <button id="downloadCsv"
+                  class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                  Download CSV
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="min-w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                  <tr class="text-left text-xs font-semibold text-slate-600">
+                    <th class="px-4 py-3 cursor-pointer select-none" data-sort="ticker">Ticker <span class="text-slate-400" id="sort_ticker"></span></th>
+                    <th class="px-4 py-3 cursor-pointer select-none" data-sort="name">Name <span class="text-slate-400" id="sort_name"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="value">Market Value <span class="text-slate-400" id="sort_value"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="weight">Weight <span class="text-slate-400" id="sort_weight"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="ret12m">12M Return <span class="text-slate-400" id="sort_ret12m"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="contrib">Contribution <span class="text-slate-400" id="sort_contrib"></span></th>
+                    <th class="px-4 py-3 cursor-pointer select-none" data-sort="sector">Sector <span class="text-slate-400" id="sort_sector"></span></th>
+                  </tr>
+                </thead>
+                <tbody id="holdingsBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <span class="font-medium text-slate-700">Shareable state:</span>
+                <span class="text-slate-500">#start=…&end=…&currency=…&region=…&chartMode=…&benchmark=…</span>
+              </div>
+              <div class="text-slate-500">
+                Current: currency=<span class="font-medium text-slate-700" id="stateCurrency"></span>,
+                benchmark=<span class="font-medium text-slate-700" id="stateBenchmark"></span>,
+                region=<span class="font-medium text-slate-700" id="stateRegion"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- DETAILS DRAWER -->
+    <div id="drawerOverlay" class="fixed inset-0 bg-black/30 hidden z-50" aria-hidden="true"></div>
+
+    <aside id="detailsDrawer"
+      class="fixed top-0 right-0 h-full w-full sm:w-[420px] bg-white border-l border-slate-200 shadow-2xl translate-x-full drawer-transition z-50"
+      aria-labelledby="drawerTitle" role="dialog" aria-modal="true">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <div class="text-xs text-slate-500">Holding details</div>
+          <h3 id="drawerTitle" class="text-base font-semibold text-slate-900">—</h3>
+        </div>
+        <button id="closeDrawer"
+          class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+          Close
+        </button>
+      </div>
+
+      <div class="p-4 space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">Ticker</div>
+            <div class="mt-1 text-sm font-semibold mono" id="drawerTicker">—</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">Sector</div>
+            <div class="mt-1 text-sm font-semibold" id="drawerSector">—</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">Market Value</div>
+            <div class="mt-1 text-sm font-semibold mono" id="drawerValue">—</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">Weight</div>
+            <div class="mt-1 text-sm font-semibold mono" id="drawerWeight">—</div>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-slate-500">Price change (avg cost → current)</div>
+              <div class="mt-1 text-xl font-semibold mono" id="drawerPriceChange">—</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-slate-500">12M Return</div>
+              <div class="mt-1 text-xl font-semibold mono" id="drawerReturn">—</div>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-slate-500 leading-relaxed" id="drawerNotes">—</div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+          <h4 class="text-xs font-semibold text-slate-700">Trade summary</h4>
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="text-[11px] text-slate-500">Avg cost / share</div>
+              <div class="mt-1 text-sm font-semibold mono" id="drawerAvgBuy">—</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="text-[11px] text-slate-500">Current price</div>
+              <div class="mt-1 text-sm font-semibold mono" id="drawerCurPrice">—</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="text-[11px] text-slate-500">Realized P&L (EUR)</div>
+              <div class="mt-1 text-sm font-semibold mono" id="drawerRealized">—</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="text-[11px] text-slate-500">Unrealized P&L (EUR)</div>
+              <div class="mt-1 text-sm font-semibold mono" id="drawerUnrealized">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-xs text-slate-500">
+          Note: Realized P&L uses an average-cost approximation (not FIFO).
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    /* ============================================================
+      CORE HELPERS
+    ============================================================ */
+    const clamp = (n,min,max)=>Math.max(min,Math.min(max,n));
+    const pad2 = (n)=>String(n).padStart(2,'0');
+
+    function pct(n, digits=2){
+      const nf = new Intl.NumberFormat('en-US', { style:'percent', maximumFractionDigits: digits });
+      return nf.format(n);
+    }
+    function num(n, digits=2){
+      const nf = new Intl.NumberFormat('en-US', { maximumFractionDigits: digits });
+      return nf.format(n);
+    }
+    function money(n, currency){
+      const nf = new Intl.NumberFormat('en-US', { style:'currency', currency, maximumFractionDigits: 0 });
+      return nf.format(n);
+    }
+    function badgeClass(value){
+      if (value >= 0) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      return 'bg-rose-50 text-rose-700 border-rose-200';
+    }
+    function downloadText(filename, text) {
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+    }
+
+    function setLastUpdated() {
+      const d = new Date();
+      document.getElementById('lastUpdated').textContent =
+        `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+
+    /* ============================================================
+      URL HASH STATE
+    ============================================================ */
+    function toHash(params){
+      const pairs = Object.entries(params)
+        .filter(([_,v]) => v !== undefined && v !== null && v !== '')
+        .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
+      return '#' + pairs.join('&');
+    }
+    function fromHash(){
+      const h = (location.hash || '').replace(/^#/, '');
+      const out = {};
+      if(!h) return out;
+      h.split('&').forEach(kv => {
+        const [k,v] = kv.split('=');
+        if(k) out[decodeURIComponent(k)] = decodeURIComponent(v || '');
+      });
+      return out;
+    }
+
+    /* ============================================================
+      TIME AXIS (5Y, 60 months)
+    ============================================================ */
+    function monthStart(date){ return new Date(date.getFullYear(), date.getMonth(), 1); }
+    function addMonths(d, m){ return new Date(d.getFullYear(), d.getMonth()+m, 1); }
+    function endOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59, 999); }
+
+    const TODAY = new Date();
+    const END_MONTH_DATE = monthStart(TODAY);
+    const START_MONTH_DATE = addMonths(END_MONTH_DATE, -59);
+
+    const MONTHS = Array.from({length: 60}, (_, i) => {
+      const dt = addMonths(START_MONTH_DATE, i);
+      const label = dt.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+      return { i, dt, label };
+    });
+
+    function monthIndexToStartDate(i){ return monthStart(MONTHS[clamp(i,0,59)].dt); }
+    function monthIndexToEndDate(i){ return endOfMonth(MONTHS[clamp(i,0,59)].dt); }
+
+    function isWeekday(d){ const day = d.getDay(); return day !== 0 && day !== 6; }
+    function buildBusinessDays(startDate, endDate){
+      const days = [];
+      const d = new Date(startDate); d.setHours(0,0,0,0);
+      const e = new Date(endDate);   e.setHours(0,0,0,0);
+      while (d <= e) {
+        if (isWeekday(d)) days.push(new Date(d));
+        d.setDate(d.getDate()+1);
+      }
+      return days;
+    }
+
+    const FULL_START = monthIndexToStartDate(0);
+    const FULL_END = monthIndexToEndDate(59);
+    const BUSINESS_DAYS = buildBusinessDays(FULL_START, FULL_END);
+
+    function findIndexOnOrAfter(date){
+      const t = date.getTime();
+      for (let i=0;i<BUSINESS_DAYS.length;i++){
+        if (BUSINESS_DAYS[i].getTime() >= t) return i;
+      }
+      return 0;
+    }
+    function findIndexOnOrBefore(date){
+      const t = date.getTime();
+      for (let i=BUSINESS_DAYS.length-1;i>=0;i--){
+        if (BUSINESS_DAYS[i].getTime() <= t) return i;
+      }
+      return BUSINESS_DAYS.length-1;
+    }
+
+    /* ============================================================
+      DETERMINISTIC GENERATORS (fallback when fetch blocked/missing)
+    ============================================================ */
+    function hashSeed(str){
+      let h = 2166136261;
+      for (let i=0;i<str.length;i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0);
+    }
+    function sectorParams(sector){
+      if (sector === 'Semiconductors') return { drift: 0.00045, vol: 0.020 };
+      if (sector === 'Technology')     return { drift: 0.00038, vol: 0.017 };
+      if (sector === 'Consumer')       return { drift: 0.00030, vol: 0.015 };
+      if (sector === 'Financials')     return { drift: 0.00026, vol: 0.014 };
+      if (sector === 'Healthcare')     return { drift: 0.00022, vol: 0.012 };
+      if (sector === 'Staples')        return { drift: 0.00018, vol: 0.010 };
+      if (sector === 'ETF')            return { drift: 0.00024, vol: 0.011 };
+      return { drift: 0.00025, vol: 0.013 };
+    }
+    function generatePriceSeries(symbol, sector){
+      const seed = hashSeed(symbol);
+      const p = sectorParams(sector || 'Other');
+
+      let price = 40 + (seed % 260);
+      const out = new Array(BUSINESS_DAYS.length);
+
+      for (let i=0; i<BUSINESS_DAYS.length; i++){
+        const s1 = Math.sin((i + (seed % 97)) * 0.19);
+        const s2 = Math.cos((i + (seed % 57)) * 0.07);
+        const s3 = Math.sin((i + (seed % 31)) * 0.013);
+        const noise = (s1 * 0.55 + s2 * 0.35 + s3 * 0.25);
+        const dailyRet = p.drift + noise * (p.vol * 0.0018);
+
+        price = Math.max(1, price * (1 + dailyRet));
+        out[i] = price;
+      }
+      return out;
+    }
+    function generateBenchmarkSeries(){
+      let idx = 100;
+      const out = new Array(BUSINESS_DAYS.length);
+      for (let i=0;i<BUSINESS_DAYS.length;i++){
+        const s1 = Math.sin(i * 0.17) * 0.6;
+        const s2 = Math.cos(i * 0.05) * 0.4;
+        const s3 = Math.sin(i * 0.011) * 0.3;
+        const noise = (s1 + s2 + s3);
+        const drift = 0.00028;
+        const vol = 0.012;
+        const ret = drift + noise * (vol * 0.0018);
+        idx = Math.max(10, idx * (1 + ret));
+        out[i] = idx;
+      }
+      return out;
+    }
+    function generateEurUsdSeries(){
+      // A gentle-moving EURUSD proxy around 1.08–1.12
+      let r = 1.09;
+      const out = new Array(BUSINESS_DAYS.length);
+      for (let i=0;i<BUSINESS_DAYS.length;i++){
+        const s = Math.sin(i*0.03)*0.004 + Math.cos(i*0.011)*0.003;
+        r = clamp(r + s, 0.90, 1.40);
+        out[i] = r;
+      }
+      return out;
+    }
+
+    /* ============================================================
+      CSV PARSING
+    ============================================================ */
+    function parseCSV(text){
+      // Minimal CSV parser with quote support (no external libs)
+      const rows = [];
+      let row = [];
+      let field = '';
+      let inQuotes = false;
+
+      for (let i=0; i<text.length; i++){
+        const c = text[i];
+        if (inQuotes){
+          if (c === '"'){
+            if (text[i+1] === '"'){ field += '"'; i++; }
+            else inQuotes = false;
+          } else field += c;
+        } else {
+          if (c === '"') inQuotes = true;
+          else if (c === ','){ row.push(field); field = ''; }
+          else if (c === '\n'){
+            row.push(field);
+            if (row.some(x => (x||'').trim() !== '')) rows.push(row);
+            row = []; field = '';
+          } else if (c === '\r'){ /* ignore */ }
+          else field += c;
+        }
+      }
+      row.push(field);
+      if (row.some(x => (x||'').trim() !== '')) rows.push(row);
+      return rows;
+    }
+    function normKey(k){
+      return (k || '').trim().toLowerCase().replace(/\s+/g,'').replace(/[_-]/g,'');
+    }
+    function toNum(x){
+      if (x == null) return null;
+      const s = String(x).trim();
+      if (!s) return null;
+      const cleaned = s.replace(/[€$£]/g,'').replace(/\s/g,'').replace(/%/g,'');
+      const eu = /^[0-9]{1,3}(\.[0-9]{3})+(,[0-9]+)?$/.test(cleaned);
+      if (eu){
+        const t = cleaned.replace(/\./g,'').replace(',','.');
+        const v = Number(t);
+        return Number.isFinite(v) ? v : null;
+      }
+      const t = cleaned.replace(/,/g,'');
+      const v = Number(t);
+      return Number.isFinite(v) ? v : null;
+    }
+    function readFileText(file){
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result || ''));
+        fr.onerror = () => reject(fr.error);
+        fr.readAsText(file);
+      });
+    }
+
+    function dateToISO(d){
+      return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+    }
+    function parseISODate(s){
+      const t = String(s || '').trim();
+      const m = t.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})$/);
+      if (!m) return null;
+      const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+      if (Number.isNaN(d.getTime())) return null;
+      d.setHours(0,0,0,0);
+      return d;
+    }
+
+    /* ============================================================
+      ONLINE PRICE FETCH (Stooq CSV via optional proxy)
+      - If fetch fails, we fall back to deterministic synthetic series.
+    ============================================================ */
+    function stooqHistoryUrl(symbol){
+      // daily history CSV: Date,Open,High,Low,Close,Volume
+      return `https://stooq.com/q/d/l/?s=${encodeURIComponent(symbol)}&i=d`;
+    }
+    async function fetchTextMaybeProxy(upstreamUrl, proxyBase){
+      const url = (proxyBase && proxyBase.trim())
+        ? (proxyBase.trim() + encodeURIComponent(upstreamUrl))
+        : upstreamUrl;
+      const res = await fetch(url, { method:'GET' });
+      if (!res.ok) throw new Error(`Fetch failed ${res.status}`);
+      return await res.text();
+    }
+    function parseStooqDailyCsvToMap(csvText){
+      const lines = csvText.trim().split(/\r?\n/);
+      if (lines.length < 2) return null;
+      const header = (lines.shift() || '').toLowerCase();
+      if (!header.includes('date') || !header.includes('close')) return null;
+
+      const map = new Map();
+      for (const line of lines){
+        const cols = line.split(',');
+        const date = cols[0];
+        const close = Number(cols[4]);
+        if (!date || !Number.isFinite(close)) continue;
+        map.set(date, close);
+      }
+      return map.size ? map : null;
+    }
+    function alignSeriesToBusinessDays(pointsMap){
+      let first = null;
+      for (const d of BUSINESS_DAYS){
+        const iso = dateToISO(d);
+        if (pointsMap.has(iso)) { first = pointsMap.get(iso); break; }
+      }
+      if (first == null) return null;
+
+      const out = new Array(BUSINESS_DAYS.length);
+      let last = null;
+      for (let i=0;i<BUSINESS_DAYS.length;i++){
+        const iso = dateToISO(BUSINESS_DAYS[i]);
+        if (pointsMap.has(iso)) last = pointsMap.get(iso);
+        if (last == null) last = first;
+        out[i] = last;
+      }
+      return out;
+    }
+    async function fetchAlignedSeries(symbol, proxyBase){
+      const txt = await fetchTextMaybeProxy(stooqHistoryUrl(symbol), proxyBase);
+      const map = parseStooqDailyCsvToMap(txt);
+      if (!map) return null;
+      return alignSeriesToBusinessDays(map);
+    }
+    async function asyncPool(limit, items, fn){
+      const ret = [];
+      const executing = [];
+      for (const item of items){
+        const p = Promise.resolve().then(()=>fn(item));
+        ret.push(p);
+        if (limit <= items.length){
+          const e = p.then(()=> executing.splice(executing.indexOf(e),1));
+          executing.push(e);
+          if (executing.length >= limit) await Promise.race(executing);
+        }
+      }
+      return Promise.allSettled(ret);
+    }
+
+    /* ============================================================
+      DATA STORE (mutable; dummy or tx-derived)
+    ============================================================ */
+    const dataStore = {
+      mode: 'dummy',               // 'dummy' | 'tx+online' | 'tx+synthetic'
+      holdings: [],                // holding rows (seriesKey)
+      transactions: [],            // parsed transactions
+      fullPriceLocal: new Map(),   // tickerSymbol -> price array (local ccy)
+      eurusd: [],                  // EURUSD array aligned to BUSINESS_DAYS
+      fullValueEUR: new Map(),     // seriesKey -> value array in EUR
+      cashSeriesEUR: new Map(),    // account -> cash array in EUR (includes 'All')
+      fullBench: [],               // benchmark array aligned (index units)
+      benchSymbol: '^spx'
+    };
+
+    function setDataPill(){
+      const pill = document.getElementById('dataPill');
+      if (dataStore.mode === 'tx+online'){
+        pill.className = 'inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800';
+        pill.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-600"></span> Real data (TX + online prices)';
+      } else if (dataStore.mode === 'tx+synthetic'){
+        pill.className = 'inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900';
+        pill.innerHTML = '<span class="h-2 w-2 rounded-full bg-amber-600"></span> TX loaded (prices synthetic fallback)';
+      } else {
+        pill.className = 'inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800';
+        pill.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-500"></span> Dummy data';
+      }
+    }
+    function setStatus(text, isError){
+      const el = document.getElementById('loadStatus');
+      el.textContent = text;
+      el.className = 'mt-1 text-xs ' + (isError ? 'text-rose-700' : 'text-slate-700');
+    }
+
+    /* ============================================================
+      STATE
+    ============================================================ */
+    const state = {
+      currency: 'EUR',
+      benchmarkOn: true,
+      chartMode: 'abs', // 'abs' | 'pct'
+      theme: 'light',
+      region: 'All',
+      sector: 'All',
+      account: 'All',
+      search: '',
+      sortKey: 'value',
+      sortDir: 'desc',
+      startMonth: 48,
+      endMonth: 59
+    };
+
+    function windowDatesFromSlider(){
+      let s = clamp(state.startMonth, 0, 59);
+      let e = clamp(state.endMonth, 0, 59);
+      if (s > e) { const tmp = s; s = e; e = tmp; }
+      const start = monthIndexToStartDate(s);
+      const end = monthIndexToEndDate(e);
+      return { sMonth:s, eMonth:e, start, end };
+    }
+    function currentWindow(){
+      const { start, end, sMonth, eMonth } = windowDatesFromSlider();
+      const startIdx = findIndexOnOrAfter(start);
+      const endIdx = findIndexOnOrBefore(end);
+      return { startIdx, endIdx, sMonth, eMonth, start, end };
+    }
+
+    function eurusdAt(idx){
+      return dataStore.eurusd?.[clamp(idx,0,BUSINESS_DAYS.length-1)] ?? 1.09;
+    }
+    function eurToDisplay(amountEUR, idx){
+      if (state.currency === 'USD') return amountEUR * eurusdAt(idx);
+      return amountEUR;
+    }
+    function displayToEur(amount, currency, idx){
+      if (!currency || currency === 'EUR') return amount;
+      if (currency === 'USD') return amount / eurusdAt(idx);
+      return amount;
+    }
+    function convertPriceToDisplay(priceLocal, holdingCurrency, idx){
+      if (!holdingCurrency || holdingCurrency === state.currency) return priceLocal;
+      if (holdingCurrency === 'USD' && state.currency === 'EUR') return priceLocal / eurusdAt(idx);
+      if (holdingCurrency === 'EUR' && state.currency === 'USD') return priceLocal * eurusdAt(idx);
+      return priceLocal;
+    }
+
+    /* ============================================================
+      FILTERING / SERIES ACCESS
+    ============================================================ */
+    function holdingsFiltered(includeSearch=true){
+      const q = includeSearch ? (state.search || '').toLowerCase().trim() : '';
+      return dataStore.holdings
+        .filter(h => state.region === 'All' ? true : h.region === state.region)
+        .filter(h => state.sector === 'All' ? true : h.sector === state.sector)
+        .filter(h => state.account === 'All' ? true : (h.account === state.account))
+        .filter(h => {
+          if(!q) return true;
+          return h.ticker.toLowerCase().includes(q) ||
+                 h.name.toLowerCase().includes(q) ||
+                 (h.sector||'').toLowerCase().includes(q) ||
+                 (h.region||'').toLowerCase().includes(q) ||
+                 (h.account||'').toLowerCase().includes(q);
+        });
+    }
+    function valueSeriesEUR(h){
+      return dataStore.fullValueEUR.get(h.seriesKey) || [];
+    }
+    function computeWeights(rows, endIdx){
+      const total = rows.reduce((s,h)=> s + (valueSeriesEUR(h)[endIdx] || 0), 0) || 1;
+      return rows.map(h => ({ ...h, weight: (valueSeriesEUR(h)[endIdx] || 0) / total }));
+    }
+    function cashSeriesEURForAccount(account){
+      if (account === 'All') return dataStore.cashSeriesEUR.get('All') || new Array(BUSINESS_DAYS.length).fill(0);
+      return dataStore.cashSeriesEUR.get(account) || new Array(BUSINESS_DAYS.length).fill(0);
+    }
+
+    function portfolioSeriesEUR(rows, startIdx, endIdx){
+      const cash = cashSeriesEURForAccount(state.account).slice(startIdx, endIdx+1);
+      const out = new Array(endIdx - startIdx + 1).fill(0);
+      for (let i=0;i<out.length;i++){
+        let s = cash[i] || 0;
+        for (const h of rows){
+          const v = valueSeriesEUR(h)[startIdx + i] || 0;
+          s += v;
+        }
+        out[i] = s;
+      }
+      const endCash = cash[cash.length-1] || 0;
+      const endPort = out[out.length-1] || 1;
+      const cashPct = endPort ? (endCash / endPort) : 0;
+      return { portEUR: out, cashEURSeries: cash, cashPct };
+    }
+
+    /* ============================================================
+      RETURNS/VOLATILITY METRICS
+    ============================================================ */
+    function returnBetween(series, idxFrom, idxTo){
+      const a = series[clamp(idxFrom, 0, series.length-1)];
+      const b = series[clamp(idxTo,   0, series.length-1)];
+      return a === 0 ? 0 : (b / a) - 1;
+    }
+    function computeVol(series, endIdx, window=252){
+      const e = clamp(endIdx, 1, series.length-1);
+      const s = Math.max(1, e - window);
+      const rets = [];
+      for (let i=s; i<=e; i++){
+        rets.push((series[i] / series[i-1]) - 1);
+      }
+      const mean = rets.reduce((a,x)=>a+x,0) / (rets.length || 1);
+      const varr = rets.reduce((a,x)=>a+Math.pow(x-mean,2),0) / (rets.length || 1);
+      return Math.sqrt(varr) * Math.sqrt(252);
+    }
+    function maxDrawdown(series, sIdx, eIdx){
+      let peak = series[sIdx];
+      let mdd = 0;
+      for (let i=sIdx;i<=eIdx;i++){
+        peak = Math.max(peak, series[i]);
+        const dd = (series[i] / peak) - 1;
+        if (dd < mdd) mdd = dd;
+      }
+      return mdd;
+    }
+    function sharpe(series, sIdx, eIdx){
+      const total = returnBetween(series, sIdx, eIdx);
+      const days = Math.max(2, eIdx - sIdx + 1);
+      const ann = Math.pow(1 + total, 252 / days) - 1;
+      const vol = computeVol(series, eIdx, Math.min(252, days-1));
+      const rf = 0.02;
+      return (ann - rf) / (vol || 1);
+    }
+
+    /* ============================================================
+      KPI RENDERING
+    ============================================================ */
+    function renderKpiReturnRow2(items){
+      const el = document.getElementById('kpiReturnRow2');
+      el.innerHTML = items.map(x => `
+        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+          <div class="text-[11px] text-slate-500">${x.label}</div>
+          <div class="mt-1 flex items-baseline justify-between gap-2">
+            <div class="text-sm font-semibold mono text-slate-900">${x.port>=0?'+':''}${pct(x.port,2)}</div>
+            <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.delta)} mono">${x.delta>=0?'+':''}${pct(x.delta,2)}</div>
+          </div>
+          <div class="mt-1 text-[11px] text-slate-500">Δ vs Benchmark</div>
+        </div>
+      `).join('');
+    }
+
+    function renderKpis(rowsForAll, win){
+      const { portEUR, cashEURSeries, cashPct } = portfolioSeriesEUR(rowsForAll, win.startIdx, win.endIdx);
+
+      // convert EUR series to display currency with daily FX (if USD)
+      const portDisp = portEUR.map((v,i)=> eurToDisplay(v, win.startIdx + i));
+      const cashDisp = cashEURSeries.map((v,i)=> eurToDisplay(v, win.startIdx + i));
+
+      const last = portDisp[portDisp.length-1];
+      const prev = portDisp[Math.max(0, portDisp.length-2)];
+      const deltaDay = prev ? ((last/prev) - 1) : 0;
+
+      document.getElementById('kpiTotalValue').textContent = money(last, state.currency);
+      const valBadge = document.getElementById('kpiValueDeltaBadge');
+      valBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(deltaDay)} mono`;
+      valBadge.textContent = `${deltaDay>=0?'+':''}${pct(deltaDay,2)}`;
+
+      const cash = cashDisp[cashDisp.length-1] || 0;
+      document.getElementById('kpiCash').textContent = money(cash, state.currency);
+      document.getElementById('kpiCashPct').textContent = pct(cashPct, 1);
+
+      // volatility on display series (includes FX if USD)
+      const fullStart = 0;
+      const fullEnd = win.endIdx;
+      // Build full portfolio series up to endIdx for current filters
+      const full = [];
+      for (let i=fullStart;i<=fullEnd;i++){
+        let s = cashSeriesEURForAccount(state.account)[i] || 0;
+        for (const h of rowsForAll){
+          s += (valueSeriesEUR(h)[i] || 0);
+        }
+        full.push(eurToDisplay(s, i));
+      }
+      const endIdxFull = full.length - 1;
+      const vol12 = computeVol(full, endIdxFull, 252);
+      const volPrior = computeVol(full, Math.max(1, endIdxFull - 252), 252);
+      const volDelta = vol12 - volPrior;
+
+      document.getElementById('kpiVolatility').textContent = pct(vol12, 2);
+      const volBadge = document.getElementById('kpiVolDeltaBadge');
+      volBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(volDelta)} mono`;
+      volBadge.textContent = `${volDelta>=0?'+':''}${pct(volDelta,2)}`;
+
+      // Benchmark in window
+      const benchWin = (dataStore.fullBench || []).slice(win.startIdx, win.endIdx+1);
+      const totalRet = returnBetween(portDisp, 0, portDisp.length-1);
+      const benchRet = returnBetween(benchWin, 0, benchWin.length-1);
+      const deltaBench = totalRet - benchRet;
+
+      document.getElementById('kpiTotalReturn').textContent = `${totalRet>=0?'+':''}${pct(totalRet,2)}`;
+      const totalBadge = document.getElementById('kpiTotalDeltaBadge');
+      totalBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(deltaBench)} mono`;
+      totalBadge.textContent = `${deltaBench>=0?'+':''}${pct(deltaBench,2)}`;
+
+      // row2 returns
+      const endGlobal = win.endIdx;
+      const startGlobal = win.startIdx;
+
+      const clampStart = (idx) => Math.max(startGlobal, idx);
+      const idxDaysBack = (days) => clampStart(Math.max(0, endGlobal - days));
+      const idxMonthsBack = (months) => {
+        const endDate = BUSINESS_DAYS[endGlobal];
+        const target = new Date(endDate.getFullYear(), endDate.getMonth() - months, endDate.getDate());
+        return clampStart(findIndexOnOrBefore(target));
+      };
+
+      const mk = (label, fromIdxGlobal) => {
+        const fromLocal = fromIdxGlobal - startGlobal;
+        const portR = returnBetween(portDisp, fromLocal, portDisp.length-1);
+        const benchR = returnBetween(benchWin, fromLocal, benchWin.length-1);
+        return { label, port: portR, delta: portR - benchR };
+      };
+
+      renderKpiReturnRow2([
+        mk('1Y', idxMonthsBack(12)),
+        mk('1Q', idxMonthsBack(3)),
+        mk('1M', idxMonthsBack(1)),
+        mk('1W', idxDaysBack(5)),
+        mk('1D', idxDaysBack(1))
+      ]);
+    }
+
+    /* ============================================================
+      PERFORMANCE PANEL + TRANSACTIONS
+    ============================================================ */
+    function renderPerformancePanel(rowsForAll, win){
+      const { portEUR } = portfolioSeriesEUR(rowsForAll, win.startIdx, win.endIdx);
+      const portDisp = portEUR.map((v,i)=> eurToDisplay(v, win.startIdx + i));
+
+      const mdd = maxDrawdown(portDisp, 0, portDisp.length-1);
+      const sh = sharpe(portDisp, 0, portDisp.length-1);
+
+      // Beta heuristic: based on sector mix
+      const techWeight = rowsForAll.filter(h=>h.sector==='Technology').reduce((s,h)=>s+(h.weight||0),0);
+      const semiWeight = rowsForAll.filter(h=>h.sector==='Semiconductors').reduce((s,h)=>s+(h.weight||0),0);
+      const defWeight  = rowsForAll.filter(h=>['Staples','Healthcare'].includes(h.sector)).reduce((s,h)=>s+(h.weight||0),0);
+      const beta = clamp(1.00 + 0.25*semiWeight + 0.12*techWeight - 0.20*defWeight, 0.60, 1.60);
+
+      const sells = (dataStore.transactions || []).filter(t => t.type === 'SELL' && t.pnlEUR != null);
+      const wins = sells.filter(t => (t.pnlEUR || 0) > 0);
+      const hit = sells.length ? wins.length / sells.length : 0;
+
+      document.getElementById('perfDrawdown').textContent = pct(mdd, 1);
+      document.getElementById('perfSharpe').textContent = num(sh, 2);
+      document.getElementById('perfBeta').textContent = num(beta, 2);
+      document.getElementById('perfHitRate').textContent = pct(hit, 0);
+    }
+
+    function renderTransactions(){
+      const rows = (dataStore.transactions || [])
+        .filter(t => t.type === 'BUY' || t.type === 'SELL')
+        .slice()
+        .sort((a,b)=> (b.idx ?? 0) - (a.idx ?? 0))
+        .slice(0,5)
+        .map(t => {
+          const amtEUR = t.amountEUR ?? 0;
+          const pnlEUR = t.pnlEUR ?? null;
+          const idx = t.idx ?? (BUSINESS_DAYS.length-1);
+          return {
+            ...t,
+            amountDisp: eurToDisplay(amtEUR, idx),
+            pnlDisp: pnlEUR == null ? null : eurToDisplay(pnlEUR, idx)
+          };
+        });
+
+      const body = document.getElementById('txBody');
+      body.innerHTML = rows.map(t => {
+        const typeBadge = t.type === 'BUY'
+          ? 'bg-blue-50 text-blue-800 border-blue-200'
+          : 'bg-blue-700 text-white border-blue-700';
+
+        const pnlBadge = t.pnlDisp == null
+          ? `<span class="text-[11px] text-slate-400">—</span>`
+          : `<span class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(t.pnlDisp)} mono">${t.pnlDisp>=0?'+':''}${money(t.pnlDisp, state.currency)}</span>`;
+
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-3 text-xs text-slate-700 mono">${t.date || '—'}</td>
+            <td class="px-4 py-3"><span class="text-[11px] px-2 py-1 rounded-lg border ${typeBadge}">${t.type}</span></td>
+            <td class="px-4 py-3 text-xs font-semibold text-slate-900">${t.ticker || '—'}</td>
+            <td class="px-4 py-3 text-xs text-slate-700 text-right mono">${money(t.amountDisp || 0, state.currency)}</td>
+            <td class="px-4 py-3 text-right">${pnlBadge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    /* ============================================================
+      DONUT CHART
+    ============================================================ */
+    const donutColors = ["#1d4ed8", "#3b82f6", "#60a5fa", "#94a3b8"];
+    let donutChart = null;
+
+    function computeAllocation(rows, endIdx){
+      const totals = { Americas:0, Europe:0, APAC:0, Other:0 };
+      rows.forEach(h => {
+        const v = valueSeriesEUR(h)[endIdx] || 0;
+        totals[h.region] = (totals[h.region] || 0) + v;
+      });
+      const sum = Object.values(totals).reduce((s,x)=>s+x,0) || 1;
+
+      return [
+        { label:'Americas', value: totals.Americas / sum },
+        { label:'Europe',   value: totals.Europe   / sum },
+        { label:'APAC',     value: totals.APAC     / sum },
+        { label:'Other',    value: totals.Other    / sum }
+      ];
+    }
+
+    function renderDonutLegend(alloc){
+      const el = document.getElementById('donutLegend');
+      el.innerHTML = alloc.map((a, i) => `
+        <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="flex items-center gap-2">
+            <span class="inline-block h-2.5 w-2.5 rounded-full" style="background:${donutColors[i]}"></span>
+            <span class="font-medium text-slate-700">${a.label}</span>
+          </div>
+          <span class="mono text-slate-700">${pct(a.value, 0)}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderDonut(rows, endIdx){
+      const alloc = computeAllocation(rows, endIdx);
+      const labels = alloc.map(a=>a.label);
+      const valuesPct = alloc.map(a=>Math.round(a.value*1000)/10);
+
+      const ctx = document.getElementById('donutChart').getContext('2d');
+      if (donutChart) donutChart.destroy();
+
+      donutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data: valuesPct,
+            backgroundColor: donutColors,
+            borderColor: (state.theme === 'dark') ? "#0b1220" : "#ffffff",
+            borderWidth: 2,
+            hoverOffset: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '68%',
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (c)=>`${c.label}: ${c.parsed}%` } }
+          },
+          onClick: (_, elements) => {
+            if (!elements || !elements.length) return;
+            const idx = elements[0].index;
+            const clicked = labels[idx];
+            state.region = (state.region === clicked) ? 'All' : clicked;
+            document.getElementById('selectedRegionLabel').textContent = state.region;
+            syncHashFromState();
+            updateAll();
+          }
+        }
+      });
+
+      renderDonutLegend(alloc);
+    }
+
+    /* ============================================================
+      TABLE + SORT + CSV EXPORT
+    ============================================================ */
+    function sortHoldings(rows){
+      const key = state.sortKey;
+      const dir = state.sortDir === 'asc' ? 1 : -1;
+
+      const getter = (r) => {
+        if (key === 'ticker') return r.ticker;
+        if (key === 'name') return r.name;
+        if (key === 'sector') return r.sector;
+        if (key === 'value') return r.valueEUR;
+        if (key === 'weight') return r.weight;
+        if (key === 'ret12m') return r.ret12m;
+        if (key === 'contrib') return r.contrib;
+        return r.valueEUR;
+      };
+
+      return [...rows].sort((a,b) => {
+        const A = getter(a), B = getter(b);
+        if (typeof A === 'string') return A.localeCompare(B) * dir;
+        return (A - B) * dir;
+      });
+    }
+
+    function clearSortIndicators(){
+      ['ticker','name','value','weight','ret12m','contrib','sector'].forEach(k => {
+        const el = document.getElementById('sort_'+k);
+        if (el) el.textContent = '';
+      });
+    }
+    function setSortIndicator(key){
+      clearSortIndicators();
+      const el = document.getElementById('sort_'+key);
+      if (!el) return;
+      el.textContent = state.sortDir === 'asc' ? ' ▲' : ' ▼';
+    }
+
+    function renderHoldingsTable(rows){
+      const win = currentWindow();
+      const tbody = document.getElementById('holdingsBody');
+
+      tbody.innerHTML = rows.map((h, idx) => {
+        const retBadge = `<span class="text-xs px-2 py-1 rounded-lg border ${badgeClass(h.ret12m || 0)} mono">${(h.ret12m||0)>=0?'+':''}${pct(h.ret12m||0,2)}</span>`;
+        const contribBadge = `<span class="text-xs px-2 py-1 rounded-lg border bg-blue-50 text-blue-800 border-blue-200 mono">${(h.contrib||0)>=0?'+':''}${pct(h.contrib||0,2)}</span>`;
+        return `
+          <tr class="hover:bg-slate-50 cursor-pointer" data-row="${idx}">
+            <td class="px-4 py-3 text-sm font-semibold text-slate-900">${h.ticker}</td>
+            <td class="px-4 py-3 text-sm text-slate-700">${h.name}${h.account && h.account!=='All' && state.account==='All' ? `<span class="ml-2 text-[11px] text-slate-500">(${h.account})</span>` : ''}</td>
+            <td class="px-4 py-3 text-sm text-slate-700 text-right mono">${money(eurToDisplay((h.valueEUR||0), win.endIdx), state.currency)}</td>
+            <td class="px-4 py-3 text-sm text-slate-700 text-right mono">${pct(h.weight||0,1)}</td>
+            <td class="px-4 py-3 text-right">${retBadge}</td>
+            <td class="px-4 py-3 text-right">${contribBadge}</td>
+            <td class="px-4 py-3 text-sm text-slate-600">${h.sector || 'Other'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      Array.from(tbody.querySelectorAll('tr[data-row]')).forEach((tr, i) => {
+        tr.addEventListener('click', () => openDrawer(rows[i]));
+      });
+    }
+
+    function exportHoldingsCsv(rows){
+      const win = currentWindow();
+      const header = ['Ticker','Name','MarketValue','Weight','Return12M','Contribution','Sector','Region','Account','Currency'];
+      const lines = [header.join(',')];
+      rows.forEach(h => {
+        const line = [
+          h.ticker,
+          `"${String(h.name||'').replace(/"/g,'""')}"`,
+          (eurToDisplay((h.valueEUR||0), win.endIdx)).toFixed(2),
+          (h.weight||0).toFixed(6),
+          (h.ret12m||0).toFixed(6),
+          (h.contrib||0).toFixed(6),
+          `"${h.sector||''}"`,
+          `"${h.region||''}"`,
+          `"${h.account||''}"`,
+          `"${h.currency||''}"`
+        ];
+        lines.push(line.join(','));
+      });
+      downloadText('holdings_export.csv', lines.join('\n'));
+    }
+
+    /* ============================================================
+      DETAILS DRAWER
+    ============================================================ */
+    const drawer = document.getElementById('detailsDrawer');
+    const overlay = document.getElementById('drawerOverlay');
+
+    function openDrawer(h){
+      const win = currentWindow();
+      const endIdx = win.endIdx;
+
+      document.getElementById('drawerTitle').textContent = `${h.name || '—'}`;
+      document.getElementById('drawerTicker').textContent = h.ticker || '—';
+      document.getElementById('drawerSector').textContent = h.sector || '—';
+      document.getElementById('drawerValue').textContent = money(eurToDisplay((h.valueEUR||0), endIdx), state.currency);
+      document.getElementById('drawerWeight').textContent = pct(h.weight||0, 2);
+
+      const avgCostLocal = (h.avgCostLocal ?? null);
+      const curPriceLocal = (h.curPriceLocal ?? null);
+      const avgDisp = avgCostLocal == null ? null : convertPriceToDisplay(avgCostLocal, h.currency, endIdx);
+      const curDisp = curPriceLocal == null ? null : convertPriceToDisplay(curPriceLocal, h.currency, endIdx);
+
+      const priceChange = (avgCostLocal && curPriceLocal) ? ((curPriceLocal / avgCostLocal) - 1) : 0;
+      document.getElementById('drawerPriceChange').textContent = `${priceChange>=0?'+':''}${pct(priceChange, 2)}`;
+      document.getElementById('drawerReturn').textContent = `${(h.ret12m||0)>=0?'+':''}${pct(h.ret12m||0, 2)}`;
+      document.getElementById('drawerNotes').textContent = h.notes || '—';
+
+      document.getElementById('drawerAvgBuy').textContent = avgDisp == null ? '—' : money(avgDisp, state.currency);
+      document.getElementById('drawerCurPrice').textContent = curDisp == null ? '—' : money(curDisp, state.currency);
+
+      const realizedEUR = h.realizedEUR || 0;
+      const vSeries = valueSeriesEUR(h);
+      const endValEUR = vSeries[endIdx] || 0;
+      const unrealizedEUR = (avgCostLocal && curPriceLocal && h.shares)
+        ? (h.shares * (curPriceLocal - avgCostLocal)) * (h.currency === 'USD' ? 1/eurusdAt(endIdx) : 1)
+        : (endValEUR * (h.ret12m || 0) * 0.15); // fallback hint
+
+      document.getElementById('drawerRealized').textContent = `${realizedEUR>=0?'+':''}${money(realizedEUR, 'EUR')}`;
+      document.getElementById('drawerUnrealized').textContent = `${unrealizedEUR>=0?'+':''}${money(unrealizedEUR, 'EUR')}`;
+
+      overlay.classList.remove('hidden');
+      drawer.classList.remove('translate-x-full');
+      overlay.setAttribute('aria-hidden','false');
+    }
+    function closeDrawer(){
+      drawer.classList.add('translate-x-full');
+      overlay.classList.add('hidden');
+      overlay.setAttribute('aria-hidden','true');
+    }
+    document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
+    overlay.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+
+    /* ============================================================
+      CHARTS (Line + baseline plugin)
+    ============================================================ */
+    Chart.defaults.font.family = "ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial";
+    function applyChartTheme(){
+      const dark = state.theme === 'dark';
+      Chart.defaults.color = dark ? "#e2e8f0" : "#334155";
+    }
+    function palette(i){
+      const colors = [
+        "#1d4ed8", "#0f172a", "#334155", "#3b82f6", "#64748b",
+        "#2563eb", "#475569", "#60a5fa", "#94a3b8", "#1e293b"
+      ];
+      return colors[i % colors.length];
+    }
+
+    const zeroLinePlugin = {
+      id: 'zeroLine',
+      afterDraw(chart, args, opts){
+        if (!opts || !opts.enabled) return;
+        const { ctx, chartArea, scales } = chart;
+        if (!scales || !scales.y) return;
+        const y0 = scales.y.getPixelForValue(0);
+        if (y0 < chartArea.top || y0 > chartArea.bottom) return;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, y0);
+        ctx.lineTo(chartArea.right, y0);
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4,4]);
+        ctx.strokeStyle = (state.theme === 'dark') ? "rgba(148,163,184,0.35)" : "rgba(100,116,139,0.35)";
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+    Chart.register(zeroLinePlugin);
+
+    let lineChart = null;
+
+    function sampleLabels(dates, maxTicks=16){
+      const n = dates.length;
+      const label = (d)=>d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+      if (n <= maxTicks) return dates.map(label);
+      const step = Math.ceil(n / maxTicks);
+      return dates.map((d,i)=> (i % step === 0 || i === n-1) ? label(d) : '');
+    }
+
+    function thicknessTiers(values){
+      const sorted = [...values].sort((a,b)=>a-b);
+      const q = (p)=>sorted[Math.floor(p*(sorted.length-1))] || 0;
+      const q40 = q(0.40), q70 = q(0.70), q90 = q(0.90);
+
+      return values.map(v => {
+        if (v >= q90) return 5;
+        if (v >= q70) return 4;
+        if (v >= q40) return 3;
+        return 2;
+      });
+    }
+
+    function renderLineChart(rows, win){
+      const dates = BUSINESS_DAYS.slice(win.startIdx, win.endIdx+1);
+      const labels = sampleLabels(dates, 16);
+
+      // Holding series in EUR -> convert per-day to display currency
+      const holdingsSeriesDisp = rows.map(h => {
+        const eur = valueSeriesEUR(h).slice(win.startIdx, win.endIdx+1);
+        return eur.map((v,i)=> eurToDisplay(v, win.startIdx + i));
+      });
+
+      // cash + portfolio (EUR -> display daily)
+      const cashEUR = cashSeriesEURForAccount(state.account).slice(win.startIdx, win.endIdx+1);
+      const cashDisp = cashEUR.map((v,i)=> eurToDisplay(v, win.startIdx + i));
+      const holdingsSumDisp = dates.map((_,i)=> holdingsSeriesDisp.reduce((s,hs)=>s+(hs[i]||0),0));
+      const portfolioDisp = holdingsSumDisp.map((v,i)=> v + (cashDisp[i]||0));
+
+      const bench = (dataStore.fullBench || []).slice(win.startIdx, win.endIdx+1);
+
+      const rebase = (arr)=> {
+        const first = arr[0] || 1;
+        return arr.map(v => (v/first) - 1);
+      };
+
+      const isPct = state.chartMode === 'pct';
+      const showBench = state.benchmarkOn;
+
+      const endVals = holdingsSeriesDisp.map(s => s[s.length-1] || 0);
+      const tiers = thicknessTiers(endVals);
+
+      const isMobile = window.matchMedia('(max-width: 640px)').matches;
+      const rankIdx = endVals.map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v).map(o=>o.i);
+      const mobileShowSet = new Set(rankIdx.slice(0, 4)); // top 4 holdings + portfolio
+
+      const datasets = [];
+
+      datasets.push({
+        label: 'Portfolio',
+        data: isPct ? rebase(portfolioDisp) : portfolioDisp.map(v=>Math.round(v)),
+        borderColor: "#1d4ed8",
+        backgroundColor: isPct ? "rgba(0,0,0,0)" : "rgba(29,78,216,0.10)",
+        fill: !isPct,
+        tension: 0.35,
+        pointRadius: 0,
+        borderWidth: isPct ? 6 : 3,
+        yAxisID: 'y'
+      });
+
+      rows.forEach((h, i) => {
+        const abs = holdingsSeriesDisp[i];
+        const label = (state.account === 'All' && h.account && h.account !== 'All') ? `${h.ticker} (${h.account})` : h.ticker;
+        datasets.push({
+          label,
+          data: isPct ? rebase(abs) : abs.map(v=>Math.round(v)),
+          borderColor: palette(i+1),
+          backgroundColor: "rgba(0,0,0,0)",
+          fill: false,
+          tension: 0.35,
+          pointRadius: 0,
+          borderWidth: isPct ? tiers[i] : 2,
+          hidden: isMobile ? !mobileShowSet.has(i) : false,
+          yAxisID: 'y'
+        });
+      });
+
+      if (showBench) {
+        datasets.push({
+          label: `${dataStore.benchSymbol || 'Benchmark'} (Benchmark)`,
+          data: isPct ? rebase(bench) : bench.map(v=>Math.round(v)),
+          borderColor: "#64748b",
+          backgroundColor: "rgba(0,0,0,0)",
+          fill: false,
+          tension: 0.35,
+          pointRadius: 0,
+          borderDash: [6,6],
+          borderWidth: 2,
+          yAxisID: isPct ? 'y' : 'y1'
+        });
+      }
+
+      const gridColor = (state.theme === 'dark') ? "rgba(148,163,184,0.18)" : "rgba(148,163,184,0.25)";
+
+      const ctx = document.getElementById('lineChart').getContext('2d');
+      if (lineChart) lineChart.destroy();
+
+      lineChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              position: 'top',
+              align: 'end',
+              labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: 'circle' }
+            },
+            tooltip: {
+              callbacks: {
+                title: (items)=>{
+                  const idx = items[0].dataIndex;
+                  return dates[idx].toLocaleDateString('en-US', { year:'numeric', month:'short', day:'2-digit' });
+                },
+                label: (ctx)=>{
+                  const label = ctx.dataset.label || '';
+                  const y = ctx.parsed.y;
+
+                  if (isPct) return `${label}: ${y>=0?'+':''}${pct(y,2)}`;
+
+                  if (label.includes('Benchmark')) return `${label}: ${num(y,0)} (Index)`;
+                  return `${label}: ${money(y, state.currency)}`;
+                }
+              }
+            },
+            zeroLine: { enabled: isPct }
+          },
+          scales: {
+            x: {
+              grid: { color: "rgba(0,0,0,0)", drawBorder: false },
+              ticks: { color: (state.theme === 'dark') ? "#cbd5e1" : "#64748b" }
+            },
+            y: {
+              position: 'left',
+              grid: { color: gridColor, drawBorder: false },
+              ticks: {
+                callback: (v)=>{
+                  if (isPct) return (v>=0?'+':'') + pct(v,0);
+                  if (v >= 1000000) return (state.currency==='EUR'?'€ ':'$ ') + (v/1000000).toFixed(2) + 'm';
+                  if (v >= 1000) return (state.currency==='EUR'?'€ ':'$ ') + (v/1000).toFixed(0) + 'k';
+                  return v;
+                }
+              }
+            },
+            y1: {
+              display: !isPct && showBench,
+              position: 'right',
+              grid: { drawOnChartArea: false, drawBorder: false },
+              ticks: { callback: (v)=> num(v,0) }
+            }
+          }
+        }
+      });
+    }
+
+    /* ============================================================
+      SLIDER LABELS
+    ============================================================ */
+    function updateSliderLabels(){
+      let s = clamp(state.startMonth, 0, 59);
+      let e = clamp(state.endMonth, 0, 59);
+      if (s > e) { const tmp = s; s = e; e = tmp; }
+
+      const startLab = MONTHS[s].label;
+      const endLab = MONTHS[e].label;
+
+      document.getElementById('rangeLabelStart').textContent = startLab;
+      document.getElementById('rangeLabelEnd').textContent = endLab;
+      document.getElementById('startMonthVal').textContent = `#${s} • ${startLab}`;
+      document.getElementById('endMonthVal').textContent = `#${e} • ${endLab}`;
+    }
+
+    /* ============================================================
+      THEME
+    ============================================================ */
+    function applyTheme(){
+      const dark = state.theme === 'dark';
+      document.body.classList.toggle('bg-slate-50', !dark);
+      document.body.classList.toggle('text-slate-900', !dark);
+      document.body.classList.toggle('bg-slate-950', dark);
+      document.body.classList.toggle('text-slate-100', dark);
+      document.getElementById('themeState').textContent = dark ? 'Dark' : 'Light';
+      applyChartTheme();
+    }
+
+    /* ============================================================
+      HASH SYNC
+    ============================================================ */
+    function syncStateFromHash(){
+      const h = fromHash();
+      if (h.currency && ['EUR','USD'].includes(h.currency)) state.currency = h.currency;
+      if (h.region) state.region = h.region;
+      if (h.sector) state.sector = h.sector;
+      if (h.account) state.account = h.account;
+
+      if (h.chartMode && ['abs','pct'].includes(h.chartMode)) state.chartMode = h.chartMode;
+      if (h.benchmark !== undefined) state.benchmarkOn = (h.benchmark === '1' || h.benchmark === 'true' || h.benchmark === 'On');
+
+      if (h.theme && ['light','dark'].includes(h.theme)) state.theme = h.theme;
+      if (h.start !== undefined) state.startMonth = clamp(parseInt(h.start,10) || state.startMonth, 0, 59);
+      if (h.end !== undefined) state.endMonth = clamp(parseInt(h.end,10) || state.endMonth, 0, 59);
+      if (h.search !== undefined) state.search = h.search;
+      if (h.sortKey) state.sortKey = h.sortKey;
+      if (h.sortDir && ['asc','desc'].includes(h.sortDir)) state.sortDir = h.sortDir;
+    }
+
+    function syncHashFromState(){
+      const hash = toHash({
+        start: state.startMonth,
+        end: state.endMonth,
+        currency: state.currency,
+        region: state.region,
+        sector: state.sector,
+        account: state.account,
+        chartMode: state.chartMode,
+        benchmark: state.benchmarkOn ? '1' : '0',
+        theme: state.theme,
+        search: state.search,
+        sortKey: state.sortKey,
+        sortDir: state.sortDir
+      });
+      if (location.hash !== hash) history.replaceState(null, '', hash);
+    }
+
+    function renderStateFooter(){
+      document.getElementById('stateCurrency').textContent = state.currency;
+      document.getElementById('stateBenchmark').textContent = state.benchmarkOn ? 'On' : 'Off';
+      document.getElementById('stateRegion').textContent = state.region;
+      document.getElementById('benchmarkState').textContent = state.benchmarkOn ? 'On' : 'Off';
+      document.getElementById('selectedRegionLabel').textContent = state.region;
+      document.getElementById('benchLabel').textContent = dataStore.benchSymbol ? `${dataStore.benchSymbol}` : 'Benchmark';
+    }
+
+    /* ============================================================
+      UPDATE ALL
+    ============================================================ */
+    function updateAll(){
+      const win = currentWindow();
+
+      const rowsAll = computeWeights(holdingsFiltered(false), win.endIdx);
+      const rowsTable = computeWeights(holdingsFiltered(true), win.endIdx);
+
+      renderKpis(rowsAll, win);
+      renderPerformancePanel(rowsAll, win);
+
+      renderLineChart(rowsAll, win);
+      renderDonut(rowsAll, win.endIdx);
+
+      const sorted = sortHoldings(rowsTable).slice(0, 10);
+      setSortIndicator(state.sortKey);
+      renderHoldingsTable(sorted);
+
+      renderStateFooter();
+    }
+
+    /* ============================================================
+      TRANSACTIONS → HOLDINGS + SERIES
+    ============================================================ */
+    function inferCurrencyFromTicker(ticker){
+      const t = (ticker || '').toUpperCase();
+      if (t.endsWith('.US') || t.includes('^')) return 'USD';
+      if (t.endsWith('.NL') || t.endsWith('.DE') || t.endsWith('.FR') || t.endsWith('.BE')) return 'EUR';
+      return 'EUR';
+    }
+
+    function parseTransactionsCsvV2(csvText){
+      const rows = parseCSV(csvText);
+      if (!rows.length) throw new Error('transactions.csv is empty.');
+      const header = rows[0].map(normKey);
+      const idx = (key, alts=[]) => {
+        const keys = [key, ...alts].map(normKey);
+        for (const k of keys){
+          const i = header.indexOf(k);
+          if (i >= 0) return i;
+        }
+        return -1;
+      };
+
+      const iDate = idx('date');
+      const iTicker = idx('ticker', ['symbol']);
+      const iType = idx('type', ['action','side']);
+      const iQty = idx('quantity', ['qty','shares']);
+      const iPrice = idx('price');
+      const iFee = idx('fee', ['commission','costs']);
+      const iCcy = idx('currency', ['ccy']);
+      const iAmount = idx('amount', ['value','cashamount']);
+      const iName = idx('name');
+      const iRegion = idx('region');
+      const iSector = idx('sector');
+      const iAccount = idx('account', ['broker','portfolio']);
+      const iNotes = idx('notes', ['note','comment']);
+
+      if (iDate < 0 || iTicker < 0 || iType < 0){
+        throw new Error('transactions.csv must include at least: Date, Ticker, Type');
+      }
+
+      const out = [];
+      for (let r=1;r<rows.length;r++){
+        const row = rows[r];
+        const date = String(row[iDate] || '').trim();
+        const d = parseISODate(date);
+        if (!d) continue;
+
+        const tickerRaw = String(row[iTicker] || '').trim();
+        const ticker = tickerRaw ? tickerRaw.toUpperCase() : '';
+        const type = String(row[iType] || '').trim().toUpperCase();
+        const quantity = iQty >= 0 ? (toNum(row[iQty]) ?? null) : null;
+        const price = iPrice >= 0 ? (toNum(row[iPrice]) ?? null) : null;
+        const fee = iFee >= 0 ? (toNum(row[iFee]) ?? 0) : 0;
+        const currency = iCcy >= 0 ? String(row[iCcy] || '').trim().toUpperCase() : '';
+        const amount = iAmount >= 0 ? (toNum(row[iAmount]) ?? null) : null;
+
+        const name = iName >= 0 ? String(row[iName] || '').trim() : '';
+        const region = iRegion >= 0 ? String(row[iRegion] || '').trim() : '';
+        const sector = iSector >= 0 ? String(row[iSector] || '').trim() : '';
+        const account = iAccount >= 0 ? String(row[iAccount] || '').trim() : 'All';
+        const notes = iNotes >= 0 ? String(row[iNotes] || '').trim() : '';
+
+        // Normalize type
+        const normType = ['BUY','SELL','DEPOSIT','WITHDRAW','DIV','FEE'].includes(type) ? type : null;
+        if (!normType) continue;
+
+        out.push({
+          date,
+          d,
+          ticker,
+          type: normType,
+          quantity,
+          price,
+          fee: fee || 0,
+          currency: currency || '',
+          amount,
+          name,
+          region,
+          sector,
+          account: account || 'All',
+          notes
+        });
+      }
+      if (!out.length) throw new Error('No usable rows found in transactions.csv.');
+      return out;
+    }
+
+    function computeHoldingsAndTxMetrics(transactions){
+      // Build per-position (ticker|account) stats using avg cost
+      const pos = new Map(); // key -> stats
+      const txOut = [];
+
+      const sorted = transactions.slice().sort((a,b)=> a.d.getTime() - b.d.getTime());
+
+      for (const t of sorted){
+        const idx = findIndexOnOrAfter(t.d);
+        const ccy = (t.currency || inferCurrencyFromTicker(t.ticker) || 'EUR');
+        const key = `${t.ticker}|${t.account}`;
+
+        if (!pos.has(key)){
+          pos.set(key, {
+            seriesKey: key,
+            ticker: t.ticker,
+            name: t.name || t.ticker,
+            sector: t.sector || 'Other',
+            region: t.region || 'Other',
+            account: t.account || 'All',
+            currency: ccy,
+            shares: 0,
+            costLocal: 0,
+            avgCostLocal: null,
+            realizedEUR: 0,
+            notes: t.notes || ''
+          });
+        }
+
+        const p = pos.get(key);
+        // Prefer latest non-empty metadata
+        if (t.name) p.name = t.name;
+        if (t.sector) p.sector = t.sector;
+        if (t.region) p.region = t.region;
+        if (t.notes) p.notes = t.notes;
+        if (t.currency) p.currency = t.currency.toUpperCase();
+
+        let amountLocal = null;
+
+        if (t.type === 'BUY' || t.type === 'SELL'){
+          if (t.quantity == null || t.price == null) continue;
+          const notional = t.quantity * t.price;
+          amountLocal = (t.type === 'BUY') ? (notional + (t.fee||0)) : (notional - (t.fee||0));
+
+          // Avg cost in local currency
+          if (t.type === 'BUY'){
+            p.shares += t.quantity;
+            p.costLocal += (notional + (t.fee||0));
+            p.avgCostLocal = p.shares ? (p.costLocal / p.shares) : null;
+          } else {
+            const sellQty = t.quantity;
+            const avg = p.shares ? (p.costLocal / p.shares) : 0;
+            const costReduction = avg * sellQty;
+            const pnlLocal = (notional - (t.fee||0)) - costReduction;
+
+            // Convert pnl to EUR at this date idx
+            const pnlEUR = displayToEur(pnlLocal, p.currency, idx);
+            p.realizedEUR += pnlEUR;
+
+            p.shares = Math.max(0, p.shares - sellQty);
+            p.costLocal = Math.max(0, p.costLocal - costReduction);
+            p.avgCostLocal = p.shares ? (p.costLocal / p.shares) : null;
+
+            // attach pnl to tx
+            txOut.push({
+              date: t.date,
+              d: t.d,
+              idx,
+              type: 'SELL',
+              ticker: t.ticker,
+              account: t.account,
+              amountEUR: displayToEur(amountLocal, p.currency, idx),
+              pnlEUR
+            });
+            continue;
+          }
+
+          // BUY tx record
+          txOut.push({
+            date: t.date,
+            d: t.d,
+            idx,
+            type: t.type,
+            ticker: t.ticker,
+            account: t.account,
+            amountEUR: displayToEur(amountLocal, p.currency, idx),
+            pnlEUR: null
+          });
+        } else {
+          // cash flows (optional show later if desired)
+        }
+      }
+
+      // Filter out zero-share positions for holdings table/series
+      const holdings = Array.from(pos.values()).filter(p => (p.shares || 0) > 0.0000001);
+      return { holdings, txOut, posAll: pos };
+    }
+
+    function buildCashSeriesEUR(transactions, accounts){
+      // Per account and All: daily step series applying cash flows on tx business-day index
+      const init = () => new Array(BUSINESS_DAYS.length).fill(0);
+      const cashByAccount = new Map();
+      cashByAccount.set('All', init());
+      for (const a of accounts) cashByAccount.set(a, init());
+
+      // group tx by idx for deterministic processing
+      const txSorted = transactions.slice().sort((a,b)=> a.d.getTime() - b.d.getTime());
+      for (const t of txSorted){
+        const idx = findIndexOnOrAfter(t.d);
+        const account = t.account || 'All';
+        const ccy = (t.currency || inferCurrencyFromTicker(t.ticker) || 'EUR');
+
+        let flowLocal = 0;
+
+        if (t.type === 'DEPOSIT' || t.type === 'DIV'){
+          const amt = t.amount != null ? t.amount : null;
+          if (amt == null) continue;
+          flowLocal = +amt;
+        } else if (t.type === 'WITHDRAW' || t.type === 'FEE'){
+          const amt = t.amount != null ? t.amount : null;
+          if (amt == null) continue;
+          flowLocal = -amt;
+        } else if (t.type === 'BUY' || t.type === 'SELL'){
+          if (t.quantity == null || t.price == null) continue;
+          const notional = t.quantity * t.price;
+          const fee = t.fee || 0;
+          if (t.type === 'BUY') flowLocal = -(notional + fee);
+          else flowLocal = +(notional - fee);
+        }
+
+        const flowEUR = displayToEur(flowLocal, ccy, idx);
+
+        // Apply step: add flowEUR to all subsequent days
+        const applyStep = (arr) => {
+          for (let i=idx;i<arr.length;i++) arr[i] += flowEUR;
+        };
+
+        applyStep(cashByAccount.get('All'));
+        if (cashByAccount.has(account)) applyStep(cashByAccount.get(account));
+        else {
+          // if new account not pre-registered, create and apply
+          cashByAccount.set(account, init());
+          applyStep(cashByAccount.get(account));
+        }
+      }
+
+      return cashByAccount;
+    }
+
+    function buildValueSeriesEUR(holdings, posAll, priceLocalByTicker){
+      // Create series per holding key: shares step * price (converted to EUR if USD)
+      const valueEUR = new Map();
+
+      for (const h of holdings){
+        const key = h.seriesKey;
+        const ticker = h.ticker;
+        const ccy = h.currency || inferCurrencyFromTicker(ticker);
+
+        // Build shares step series from transactions already embedded in posAll? we stored final only.
+        // We'll rebuild shares series by scanning all transactions implicitly via a grouped list:
+        // (We can rely on dataStore.transactions, which includes ALL tx rows)
+        const shares = new Array(BUSINESS_DAYS.length).fill(0);
+        let cur = 0;
+
+        const txForThis = (dataStore.transactions || [])
+          .filter(t => t.ticker === ticker && t.account === h.account && (t.type === 'BUY' || t.type === 'SELL'))
+          .slice()
+          .sort((a,b)=> a.d.getTime() - b.d.getTime());
+
+        // Apply step updates by idx
+        const byIdx = new Map();
+        for (const t of txForThis){
+          const idx = findIndexOnOrAfter(t.d);
+          if (!byIdx.has(idx)) byIdx.set(idx, []);
+          byIdx.get(idx).push(t);
+        }
+        for (let i=0;i<shares.length;i++){
+          if (byIdx.has(i)){
+            for (const t of byIdx.get(i)){
+              const q = (t.quantity ?? 0);
+              if (t.type === 'BUY') cur += q;
+              else if (t.type === 'SELL') cur = Math.max(0, cur - q);
+            }
+          }
+          shares[i] = cur;
+        }
+        h.shares = shares[shares.length-1];
+
+        const pLocal = priceLocalByTicker.get(ticker) || generatePriceSeries(ticker, h.sector);
+        dataStore.fullPriceLocal.set(ticker, pLocal);
+
+        const out = new Array(BUSINESS_DAYS.length);
+        for (let i=0;i<out.length;i++){
+          const priceEUR = (ccy === 'USD') ? (pLocal[i] / eurusdAt(i)) : pLocal[i];
+          out[i] = shares[i] * priceEUR;
+        }
+        valueEUR.set(key, out);
+
+        // set current price local for drawer
+        h.curPriceLocal = pLocal[pLocal.length-1] || null;
+      }
+
+      return valueEUR;
+    }
+
+    function computeRet12mForHolding(h, endIdx){
+      const ticker = h.ticker;
+      const pLocal = dataStore.fullPriceLocal.get(ticker);
+      if (!pLocal || pLocal.length < 253) return 0;
+      const s = Math.max(0, endIdx - 252);
+      const p1 = pLocal[s] || 1;
+      const p2 = pLocal[endIdx] || 1;
+
+      // Convert to EUR to include FX impact for USD tickers
+      const ccy = h.currency || inferCurrencyFromTicker(ticker);
+      const a = (ccy === 'USD') ? (p1 / eurusdAt(s)) : p1;
+      const b = (ccy === 'USD') ? (p2 / eurusdAt(endIdx)) : p2;
+
+      return a ? ((b / a) - 1) : 0;
+    }
+
+    function refreshFilterOptionsFromData(){
+      const accounts = Array.from(new Set(dataStore.holdings.map(h=>h.account).filter(Boolean)));
+      const sectors = Array.from(new Set(dataStore.holdings.map(h=>h.sector).filter(Boolean)));
+
+      const accSel = document.getElementById('accountSelect');
+      const secSel = document.getElementById('sectorSelect');
+
+      const setOptions = (sel, values) => {
+        const cur = sel.value;
+        sel.innerHTML = '';
+        const optAll = document.createElement('option');
+        optAll.value = 'All';
+        optAll.textContent = 'All';
+        sel.appendChild(optAll);
+        values.sort((a,b)=>a.localeCompare(b)).forEach(v=>{
+          const o = document.createElement('option');
+          o.value = v;
+          o.textContent = v;
+          sel.appendChild(o);
+        });
+        sel.value = values.includes(cur) ? cur : 'All';
+      };
+
+      setOptions(accSel, accounts.filter(a=>a!=='All'));
+      setOptions(secSel, sectors.filter(s=>s!=='All'));
+    }
+
+    async function loadFromTransactions(){
+      const file = document.getElementById('txOnlyFile').files[0] || null;
+      if (!file){
+        setStatus('Please choose a transactions.csv file first.', true);
+        return;
+      }
+
+      const proxyBase = (document.getElementById('proxyBase').value || '').trim();
+      const benchSymbol = (document.getElementById('benchmarkSymbol').value || '^spx').trim();
+      const fxSymbol = (document.getElementById('fxSymbol').value || 'eurusd').trim();
+
+      try {
+        setStatus('Parsing transactions.csv…', false);
+        const txText = await readFileText(file);
+        const tx = parseTransactionsCsvV2(txText);
+
+        // Stash raw tx
+        dataStore.transactions = tx;
+
+        // Fetch FX first (for conversions) — fallback if blocked
+        setStatus('Fetching EURUSD history…', false);
+        let eurusd = null;
+        try {
+          eurusd = await fetchAlignedSeries(fxSymbol, proxyBase);
+        } catch (_) { eurusd = null; }
+        dataStore.eurusd = eurusd || generateEurUsdSeries();
+
+        // Compute positions + realized sell P&L in EUR
+        const { holdings, txOut } = computeHoldingsAndTxMetrics(tx);
+
+        // Unique tickers
+        const tickers = Array.from(new Set(holdings.map(h=>h.ticker).filter(Boolean)));
+
+        // Fetch prices (pool)
+        setStatus(`Fetching price history for ${tickers.length} tickers + benchmark…`, false);
+
+        const priceLocalByTicker = new Map();
+
+        const fetchTargets = tickers.slice();
+        const results = await asyncPool(4, fetchTargets, async (sym) => {
+          const s = await fetchAlignedSeries(sym, proxyBase);
+          return { sym, s };
+        });
+
+        let fetchedCount = 0;
+        for (const r of results){
+          if (r.status === 'fulfilled' && r.value && r.value.s){
+            priceLocalByTicker.set(r.value.sym.toUpperCase(), r.value.s);
+            fetchedCount++;
+          }
+        }
+
+        // Benchmark
+        let bench = null;
+        try {
+          const b = await fetchAlignedSeries(benchSymbol, proxyBase);
+          if (b) bench = b;
+        } catch (_) { bench = null; }
+        dataStore.benchSymbol = benchSymbol;
+        dataStore.fullBench = bench || generateBenchmarkSeries();
+
+        // Cash series (per account)
+        const accounts = Array.from(new Set(tx.map(t=>t.account||'All')));
+        dataStore.cashSeriesEUR = buildCashSeriesEUR(tx, accounts);
+
+        // Build value series per holding
+        dataStore.fullValueEUR = buildValueSeriesEUR(holdings, null, priceLocalByTicker);
+
+        // Set current values + ret12m + contrib
+        const endIdx = BUSINESS_DAYS.length - 1;
+        for (const h of holdings){
+          const v = valueSeriesEUR(h)[endIdx] || 0;
+          h.valueEUR = v;
+          h.ret12m = computeRet12mForHolding(h, endIdx);
+          // contribution: weight * 12m return (simple heuristic; updates after weights)
+          h.contrib = (h.ret12m || 0) * 0.08;
+          // avg cost
+          h.avgCostLocal = (h.avgCostLocal == null ? null : h.avgCostLocal);
+        }
+
+        // Merge realized EUR from tx metrics back into holding objects
+        const realizedByKey = new Map();
+        for (const t of txOut){
+          if (t.type === 'SELL' && t.pnlEUR != null){
+            const k = `${t.ticker}|${t.account}`;
+            realizedByKey.set(k, (realizedByKey.get(k) || 0) + t.pnlEUR);
+          }
+        }
+        for (const h of holdings){
+          h.realizedEUR = realizedByKey.get(h.seriesKey) || 0;
+        }
+
+        // Save txOut for mini-table (SELL pnl)
+        dataStore.transactions = txOut.concat(
+          // keep BUY tx records already included; txOut includes both BUY and SELL from metrics
+          []
+        ).sort((a,b)=> (b.idx??0)-(a.idx??0));
+
+        dataStore.holdings = holdings;
+
+        // Determine mode
+        const onlineOk = (fetchedCount >= Math.max(1, Math.floor(tickers.length * 0.6))) && !!bench;
+        dataStore.mode = onlineOk ? 'tx+online' : 'tx+synthetic';
+        setDataPill();
+
+        // Update benchmark label
+        document.getElementById('benchLabel').textContent = dataStore.benchSymbol;
+
+        // Refresh filter options
+        refreshFilterOptionsFromData();
+
+        // Status
+        const earliest = tx.map(t=>t.d).sort((a,b)=>a-b)[0];
+        const tooOld = earliest && earliest.getTime() < FULL_START.getTime();
+        const notes = [
+          `Holdings derived: ${holdings.length}`,
+          `Price fetch: ${fetchedCount}/${tickers.length} tickers`,
+          bench ? `Benchmark: ${benchSymbol}` : `Benchmark fallback`,
+          eurusd ? `FX: ${fxSymbol}` : `FX fallback`,
+          tooOld ? `Note: earliest tx < 5Y window (chart shows last 5Y only)` : ''
+        ].filter(Boolean).join(' • ');
+
+        setStatus(notes, false);
+
+        setLastUpdated();
+        renderTransactions();
+        updateAll();
+
+      } catch (err){
+        setStatus(`Error: ${err.message || String(err)}`, true);
+      }
+    }
+
+    /* ============================================================
+      DEFAULT DUMMY DATA
+    ============================================================ */
+    function loadDummyDataset(){
+      dataStore.mode = 'dummy';
+      dataStore.benchSymbol = '^spx';
+      dataStore.eurusd = generateEurUsdSeries();
+      dataStore.fullBench = generateBenchmarkSeries();
+      dataStore.fullPriceLocal = new Map();
+      dataStore.fullValueEUR = new Map();
+      dataStore.cashSeriesEUR = new Map();
+      dataStore.cashSeriesEUR.set('All', new Array(BUSINESS_DAYS.length).fill(5000)); // small constant cash for demo
+
+      const dummyHoldings = [
+        { ticker:'AAPL.US', account:'Broker A', name:'Apple Inc.',        sector:'Technology',     region:'Americas', currency:'USD', notes:'Demo position', shares:0, avgCostLocal:155, realizedEUR:1800 },
+        { ticker:'MSFT.US', account:'Broker A', name:'Microsoft',         sector:'Technology',     region:'Americas', currency:'USD', notes:'Demo position', shares:0, avgCostLocal:310, realizedEUR:1200 },
+        { ticker:'NVDA.US', account:'Broker B', name:'NVIDIA',            sector:'Semiconductors', region:'Americas', currency:'USD', notes:'Demo position', shares:0, avgCostLocal:420, realizedEUR:2600 },
+        { ticker:'ASML.NL', account:'Broker B', name:'ASML Holding',      sector:'Semiconductors', region:'Europe',   currency:'EUR', notes:'Demo position', shares:0, avgCostLocal:620, realizedEUR: 900 },
+        { ticker:'ULVR.L',  account:'Broker A', name:'Unilever',          sector:'Staples',        region:'Europe',   currency:'GBP', notes:'Demo; GBP treated as EUR for now', shares:0, avgCostLocal:45, realizedEUR:350 },
+        { ticker:'SPY.US',  account:'All',      name:'Global Equity ETF', sector:'ETF',            region:'Other',    currency:'USD', notes:'Demo ETF', shares:0, avgCostLocal:92, realizedEUR:0 }
+      ].map(h => ({ ...h, seriesKey: `${h.ticker}|${h.account}` }));
+
+      // Generate price/value series with fixed current value targets
+      for (const h of dummyHoldings){
+        const p = generatePriceSeries(h.ticker, h.sector);
+        dataStore.fullPriceLocal.set(h.ticker, p);
+
+        // make an arbitrary end value
+        const targetEUR = 60000 + (hashSeed(h.seriesKey) % 90000);
+        const endIdx = p.length-1;
+        const priceEUR = (h.currency === 'USD') ? (p[endIdx] / eurusdAt(endIdx)) : p[endIdx];
+        const shares = priceEUR ? (targetEUR / priceEUR) : 0;
+        h.shares = shares;
+        h.curPriceLocal = p[endIdx];
+
+        const v = new Array(BUSINESS_DAYS.length);
+        for (let i=0;i<v.length;i++){
+          const pe = (h.currency === 'USD') ? (p[i] / eurusdAt(i)) : p[i];
+          v[i] = shares * pe;
+        }
+        dataStore.fullValueEUR.set(h.seriesKey, v);
+        h.valueEUR = v[v.length-1];
+        h.ret12m = computeRet12mForHolding(h, v.length-1);
+        h.contrib = (h.ret12m || 0) * 0.08;
+      }
+
+      dataStore.holdings = dummyHoldings;
+
+      // Dummy tx list (already in display structure)
+      dataStore.transactions = [
+        { date:'2025-11-12', idx: findIndexOnOrAfter(new Date(2025,10,12)), type:'BUY',  ticker:'ASML.NL', account:'Broker B', amountEUR: 9500, pnlEUR: null },
+        { date:'2025-10-03', idx: findIndexOnOrAfter(new Date(2025,9,3)),  type:'SELL', ticker:'AAPL.US', account:'Broker A', amountEUR: 6200, pnlEUR:  780 },
+        { date:'2025-09-18', idx: findIndexOnOrAfter(new Date(2025,8,18)), type:'BUY',  ticker:'SPY.US',  account:'All',      amountEUR: 4200, pnlEUR: null },
+        { date:'2025-08-07', idx: findIndexOnOrAfter(new Date(2025,7,7)),  type:'SELL', ticker:'NVDA.US', account:'Broker B', amountEUR: 5100, pnlEUR:  920 },
+        { date:'2025-07-21', idx: findIndexOnOrAfter(new Date(2025,6,21)), type:'BUY',  ticker:'MSFT.US', account:'Broker A', amountEUR: 8300, pnlEUR: null }
+      ];
+
+      setDataPill();
+      refreshFilterOptionsFromData();
+    }
+
+    /* ============================================================
+      SORT INDICATORS
+    ============================================================ */
+    function bindSort(){
+      const headers = document.querySelectorAll('thead th[data-sort]');
+      headers.forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.getAttribute('data-sort');
+          if (state.sortKey === key) state.sortDir = (state.sortDir === 'asc') ? 'desc' : 'asc';
+          else {
+            state.sortKey = key;
+            state.sortDir = (key === 'ticker' || key === 'name' || key === 'sector') ? 'asc' : 'desc';
+          }
+          syncHashFromState();
+          updateAll();
+        });
+      });
+    }
+
+    /* ============================================================
+      UI BINDINGS
+    ============================================================ */
+    function setChartMode(mode){
+      state.chartMode = mode;
+      const abs = document.getElementById('modeAbs');
+      const pctBtn = document.getElementById('modePct');
+
+      if (mode === 'abs') {
+        abs.className = "text-xs px-3 py-2 rounded-lg bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-200";
+        pctBtn.className = "text-xs px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200";
+        abs.setAttribute('aria-pressed','true');
+        pctBtn.setAttribute('aria-pressed','false');
+      } else {
+        pctBtn.className = "text-xs px-3 py-2 rounded-lg bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-200";
+        abs.className = "text-xs px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200";
+        pctBtn.setAttribute('aria-pressed','true');
+        abs.setAttribute('aria-pressed','false');
+      }
+    }
+
+    function bindControls(){
+      document.getElementById('currencySelect').addEventListener('change', (e) => {
+        state.currency = e.target.value;
+        syncHashFromState();
+        renderTransactions();
+        updateAll();
+      });
+
+      document.getElementById('benchmarkToggle').addEventListener('click', () => {
+        state.benchmarkOn = !state.benchmarkOn;
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('modeAbs').addEventListener('click', () => {
+        setChartMode('abs');
+        syncHashFromState();
+        updateAll();
+      });
+      document.getElementById('modePct').addEventListener('click', () => {
+        setChartMode('pct');
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('themeToggle').addEventListener('click', () => {
+        state.theme = (state.theme === 'light') ? 'dark' : 'light';
+        applyTheme();
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('applyFilters').addEventListener('click', () => {
+        state.account = document.getElementById('accountSelect').value;
+        state.sector = document.getElementById('sectorSelect').value;
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('clearRegion').addEventListener('click', () => {
+        state.region = 'All';
+        syncHashFromState();
+        updateAll();
+      });
+      document.getElementById('resetAllocation').addEventListener('click', () => {
+        state.region = 'All';
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('searchHoldings').addEventListener('input', (e) => {
+        state.search = e.target.value || '';
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('downloadCsv').addEventListener('click', () => {
+        const win = currentWindow();
+        const rows = sortHoldings(computeWeights(holdingsFiltered(true), win.endIdx)).slice(0,10);
+        exportHoldingsCsv(rows);
+      });
+
+      document.getElementById('exportBtn').addEventListener('click', () => {
+        const msg =
+`Export (mock)
+
+State:
+- startMonth=${state.startMonth}
+- endMonth=${state.endMonth}
+- currency=${state.currency}
+- benchmark=${state.benchmarkOn ? 'On' : 'Off'}
+- chartMode=${state.chartMode}
+- region=${state.region}
+- sector=${state.sector}
+- account=${state.account}
+- search="${state.search}"
+- sortKey=${state.sortKey}
+- sortDir=${state.sortDir}
+
+Data:
+- mode=${dataStore.mode}
+- holdings=${dataStore.holdings.length}
+- benchSymbol=${dataStore.benchSymbol || '—'}
+`;
+        downloadText('export.txt', msg);
+      });
+
+      const startSlider = document.getElementById('startMonth');
+      const endSlider = document.getElementById('endMonth');
+
+      startSlider.addEventListener('input', (e)=>{
+        state.startMonth = parseInt(e.target.value, 10);
+        updateSliderLabels();
+        syncHashFromState();
+        updateAll();
+      });
+      endSlider.addEventListener('input', (e)=>{
+        state.endMonth = parseInt(e.target.value, 10);
+        updateSliderLabels();
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('preset12m').addEventListener('click', ()=>{
+        state.endMonth = 59;
+        state.startMonth = 59 - 11;
+        startSlider.value = state.startMonth;
+        endSlider.value = state.endMonth;
+        updateSliderLabels();
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('presetYTD').addEventListener('click', ()=>{
+        const now = new Date();
+        const jan = new Date(now.getFullYear(), 0, 1);
+        let idx = 0;
+        for (const m of MONTHS){
+          if (m.dt.getFullYear() === jan.getFullYear() && m.dt.getMonth() === jan.getMonth()) { idx = m.i; break; }
+        }
+        state.startMonth = idx;
+        state.endMonth = 59;
+        startSlider.value = state.startMonth;
+        endSlider.value = state.endMonth;
+        updateSliderLabels();
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('preset5y').addEventListener('click', ()=>{
+        state.startMonth = 0;
+        state.endMonth = 59;
+        startSlider.value = state.startMonth;
+        endSlider.value = state.endMonth;
+        updateSliderLabels();
+        syncHashFromState();
+        updateAll();
+      });
+
+      // Data controls
+      document.getElementById('loadTxData').addEventListener('click', loadFromTransactions);
+      document.getElementById('resetDummy').addEventListener('click', () => {
+        loadDummyDataset();
+        setLastUpdated();
+        setStatus('Using built-in dummy dataset.', false);
+        renderTransactions();
+        updateAll();
+      });
+    }
+
+    /* ============================================================
+      INIT
+    ============================================================ */
+    function init(){
+      setLastUpdated();
+      loadDummyDataset();
+      setStatus('Using built-in dummy dataset.', false);
+
+      syncStateFromHash();
+
+      document.getElementById('currencySelect').value = state.currency;
+      document.getElementById('accountSelect').value = state.account;
+      document.getElementById('sectorSelect').value = state.sector;
+      document.getElementById('searchHoldings').value = state.search;
+
+      const startSlider = document.getElementById('startMonth');
+      const endSlider = document.getElementById('endMonth');
+      startSlider.value = state.startMonth;
+      endSlider.value = state.endMonth;
+      updateSliderLabels();
+
+      setChartMode(state.chartMode);
+      applyTheme();
+      renderTransactions();
+
+      bindControls();
+      bindSort();
+      updateAll();
+
+      window.addEventListener('hashchange', () => {
+        syncStateFromHash();
+        document.getElementById('currencySelect').value = state.currency;
+        document.getElementById('accountSelect').value = state.account;
+        document.getElementById('sectorSelect').value = state.sector;
+        document.getElementById('searchHoldings').value = state.search;
+
+        startSlider.value = state.startMonth;
+        endSlider.value = state.endMonth;
+        updateSliderLabels();
+
+        setChartMode(state.chartMode);
+        applyTheme();
+        renderTransactions();
+        updateAll();
+      });
+
+      window.addEventListener('resize', () => {
+        updateAll();
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
