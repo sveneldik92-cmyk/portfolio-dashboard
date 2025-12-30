@@ -85,11 +85,6 @@
                 </button>
               </div>
 
-              <button id="themeToggle"
-                class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
-                Theme: <span class="font-medium" id="themeState">Light</span>
-              </button>
-
               <button id="exportBtn"
                 class="text-sm px-3 py-2 rounded-xl bg-blue-700 text-white shadow-sm hover:bg-blue-600 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-200">
                 Export
@@ -1685,19 +1680,6 @@
     }
 
     /* ============================================================
-      THEME
-    ============================================================ */
-    function applyTheme(){
-      const dark = state.theme === 'dark';
-      document.body.classList.toggle('bg-slate-50', !dark);
-      document.body.classList.toggle('text-slate-900', !dark);
-      document.body.classList.toggle('bg-slate-950', dark);
-      document.body.classList.toggle('text-slate-100', dark);
-      document.getElementById('themeState').textContent = dark ? 'Dark' : 'Light';
-      applyChartTheme();
-    }
-
-    /* ============================================================
       HASH SYNC
     ============================================================ */
     function syncStateFromHash(){
@@ -1710,7 +1692,6 @@
       if (h.chartMode && ['abs','pct'].includes(h.chartMode)) state.chartMode = h.chartMode;
       if (h.benchmark !== undefined) state.benchmarkOn = (h.benchmark === '1' || h.benchmark === 'true' || h.benchmark === 'On');
 
-      if (h.theme && ['light','dark'].includes(h.theme)) state.theme = h.theme;
       if (h.start !== undefined) state.startMonth = clamp(parseInt(h.start,10) || state.startMonth, 0, 59);
       if (h.end !== undefined) state.endMonth = clamp(parseInt(h.end,10) || state.endMonth, 0, 59);
       if (h.search !== undefined) state.search = h.search;
@@ -1728,7 +1709,6 @@
         account: state.account,
         chartMode: state.chartMode,
         benchmark: state.benchmarkOn ? '1' : '0',
-        theme: state.theme,
         search: state.search,
         sortKey: state.sortKey,
         sortDir: state.sortDir
@@ -2362,13 +2342,6 @@
         updateAll();
       });
 
-      document.getElementById('themeToggle').addEventListener('click', () => {
-        state.theme = (state.theme === 'light') ? 'dark' : 'light';
-        applyTheme();
-        syncHashFromState();
-        updateAll();
-      });
-
       document.getElementById('applyFilters').addEventListener('click', () => {
         state.account = document.getElementById('accountSelect').value;
         state.sector = document.getElementById('sectorSelect').value;
@@ -2509,7 +2482,7 @@ Data:
       updateSliderLabels();
 
       setChartMode(state.chartMode);
-      applyTheme();
+      applyChartTheme();
       renderTransactions();
 
       bindControls();
@@ -2528,7 +2501,7 @@ Data:
         updateSliderLabels();
 
         setChartMode(state.chartMode);
-        applyTheme();
+        applyChartTheme();
         renderTransactions();
         updateAll();
       });
