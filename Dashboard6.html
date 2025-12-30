@@ -1,0 +1,1921 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Portfolio Dashboard</title>
+
+  <!-- Tailwind CSS via CDN (no build step) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js via CDN (no additional libraries) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .drawer-transition { transition: transform 200ms ease-out; }
+    .mono { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900 font-sans">
+  <div class="min-h-screen">
+    <!-- =========================================================
+      HEADER BAR
+      ========================================================= -->
+    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-200">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-5 py-4">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-blue-700 flex items-center justify-center shadow-sm">
+              <span class="text-white font-semibold tracking-wide">BI</span>
+            </div>
+            <div>
+              <div class="text-sm text-slate-500">Corporate Portfolio Overview</div>
+              <h1 class="text-lg sm:text-xl font-semibold leading-tight">Stock Portfolio Dashboard</h1>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div class="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
+              <span class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200">
+                Last updated: <span id="lastUpdated" class="ml-1 font-medium text-slate-700"></span>
+              </span>
+              <span id="dataPill" class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800">
+                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                Dummy data
+              </span>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <label class="text-xs text-slate-500" for="currencySelect">Currency</label>
+              <select id="currencySelect"
+                class="text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+                <option value="EUR" selected>EUR</option>
+                <option value="USD">USD</option>
+              </select>
+
+              <button id="benchmarkToggle"
+                class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
+               aria-pressed="true">
+                Benchmark: <span class="font-medium" id="benchmarkState">On</span>
+              </button>
+
+              <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                <button id="modeAbs"
+                  class="text-xs px-3 py-2 rounded-lg bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  aria-pressed="true">
+                  Absolute Value
+                </button>
+                <button id="modePct"
+                  class="text-xs px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  aria-pressed="false">
+                  % Performance
+                </button>
+              </div>
+
+              <button id="themeToggle"
+                class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Theme: <span class="font-medium" id="themeState">Light</span>
+              </button>
+
+              <button id="exportBtn"
+                class="text-sm px-3 py-2 rounded-xl bg-blue-700 text-white shadow-sm hover:bg-blue-600 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Date range slider: month-level dual range (up to 5Y) -->
+        <div class="mt-4 p-4 rounded-2xl border border-slate-200 bg-slate-50">
+          <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div>
+              <div class="text-xs text-slate-500">Date range (5Y timeline • month-level granularity)</div>
+              <div class="mt-1 text-sm font-semibold text-slate-800">
+                <span id="rangeLabelStart">—</span>
+                <span class="text-slate-400 font-medium mx-1">→</span>
+                <span id="rangeLabelEnd">—</span>
+              </div>
+              <div class="mt-1 text-xs text-slate-500">
+                In “% Performance” mode, every line is rebased to <span class="font-medium text-slate-700">0%</span> at the left edge.
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <button id="preset12m"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Last 12M
+              </button>
+              <button id="presetYTD"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                YTD
+              </button>
+              <button id="preset5y"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Full 5Y
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div class="md:col-span-6">
+              <div class="flex items-center justify-between">
+                <label for="startMonth" class="text-xs font-medium text-slate-600">Start</label>
+                <span class="text-xs text-slate-500 mono" id="startMonthVal">—</span>
+              </div>
+              <input id="startMonth" type="range" min="0" max="59" step="1" value="48" class="w-full accent-blue-700">
+            </div>
+
+            <div class="md:col-span-6">
+              <div class="flex items-center justify-between">
+                <label for="endMonth" class="text-xs font-medium text-slate-600">End</label>
+                <span class="text-xs text-slate-500 mono" id="endMonthVal">—</span>
+              </div>
+              <input id="endMonth" type="range" min="0" max="59" step="1" value="59" class="w-full accent-blue-700">
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- =========================================================
+      MAIN
+      ========================================================= -->
+    <main class="max-w-[1440px] mx-auto px-4 sm:px-5 py-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- LEFT / SIDEBAR -->
+        <aside class="lg:col-span-3 space-y-6">
+          <!-- =========================================================
+            REAL DATA (Solution 1): Load local CSVs via file upload
+            - holdings.csv (required for "real holdings")
+            - prices.csv (optional but recommended; enables real history)
+            - transactions.csv (optional)
+            NOTE: Still one single HTML file; no backend; no extra libs.
+          ========================================================= -->
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Data (Local CSV Upload)</h2>
+              <p class="text-xs text-slate-500 mt-1">Load your own holdings + price history. Nothing is uploaded anywhere.</p>
+            </div>
+
+            <div class="p-4 space-y-4">
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
+                <div class="font-semibold text-slate-700">Expected CSV formats</div>
+                <div class="mt-2">
+                  <div class="font-medium">1) holdings.csv</div>
+                  <div class="mt-1">Required columns: <span class="mono">ticker, name, marketValue</span></div>
+                  <div class="mt-1">Optional: <span class="mono">sector, region, account, avgBuy, curPrice, ret12m, contrib, realized, notes</span></div>
+                  <div class="mt-1">Cash can be a row with <span class="mono">ticker=CASH</span> and <span class="mono">marketValue</span> set.</div>
+                </div>
+                <div class="mt-3">
+                  <div class="font-medium">2) prices.csv</div>
+                  <div class="mt-1">Long format: <span class="mono">date,ticker,close</span> (date like <span class="mono">YYYY-MM-DD</span>)</div>
+                  <div class="mt-1">Include a benchmark ticker too (e.g., <span class="mono">SPY</span>), or set the benchmark symbol below.</div>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="holdingsFile">Holdings CSV</label>
+                <input id="holdingsFile" type="file" accept=".csv,text/csv"
+                  class="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:px-3 file:py-2 file:rounded-xl file:border file:border-slate-200 file:bg-white file:shadow-sm hover:file:bg-slate-50 focus:outline-none" />
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="pricesFile">Prices CSV (optional)</label>
+                <input id="pricesFile" type="file" accept=".csv,text/csv"
+                  class="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:px-3 file:py-2 file:rounded-xl file:border file:border-slate-200 file:bg-white file:shadow-sm hover:file:bg-slate-50 focus:outline-none" />
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="txFile">Transactions CSV (optional)</label>
+                <input id="txFile" type="file" accept=".csv,text/csv"
+                  class="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:px-3 file:py-2 file:rounded-xl file:border file:border-slate-200 file:bg-white file:shadow-sm hover:file:bg-slate-50 focus:outline-none" />
+              </div>
+
+              <div class="grid grid-cols-1 gap-3">
+                <div>
+                  <label class="text-xs font-medium text-slate-600" for="benchmarkSymbol">Benchmark symbol</label>
+                  <input id="benchmarkSymbol" type="text" value="SPY"
+                    class="mt-1 w-full text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 mono"
+                    placeholder="SPY" />
+                  <div class="mt-1 text-[11px] text-slate-500">Used only if prices.csv includes that ticker. Otherwise falls back to the built-in mock.</div>
+                </div>
+
+                <div class="flex gap-2">
+                  <button id="loadLocalData"
+                    class="flex-1 text-sm px-3 py-2 rounded-xl bg-blue-700 text-white hover:bg-blue-600 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    Load Data
+                  </button>
+                  <button id="resetDummy"
+                    class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    Reset
+                  </button>
+                </div>
+
+                <div class="p-3 rounded-xl border border-slate-200 bg-white">
+                  <div class="text-[11px] text-slate-500">Status</div>
+                  <div id="loadStatus" class="mt-1 text-xs text-slate-700">Using built-in dummy dataset.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Filters -->
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Filters</h2>
+              <p class="text-xs text-slate-500 mt-1">Applies to KPIs, charts, and holdings.</p>
+            </div>
+
+            <div class="p-4 space-y-4">
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="accountSelect">Account</label>
+                <select id="accountSelect"
+                  class="mt-1 w-full text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+                  <option value="All" selected>All</option>
+                  <option value="Broker A">Broker A</option>
+                  <option value="Broker B">Broker B</option>
+                  <option value="Pension">Pension</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="sectorSelect">Sector</label>
+                <select id="sectorSelect"
+                  class="mt-1 w-full text-sm bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+                  <option value="All" selected>All</option>
+                  <option value="Technology">Technology</option>
+                  <option value="Semiconductors">Semiconductors</option>
+                  <option value="Financials">Financials</option>
+                  <option value="Consumer">Consumer</option>
+                  <option value="Staples">Staples</option>
+                  <option value="Healthcare">Healthcare</option>
+                  <option value="ETF">ETF</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600">Region (click donut)</label>
+                <div class="mt-1 flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div class="text-sm text-slate-700">
+                    <span class="text-slate-500">Selected:</span>
+                    <span class="font-medium" id="selectedRegionLabel">All</span>
+                  </div>
+                  <button id="clearRegion"
+                    class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <button id="applyFilters"
+                class="w-full text-sm px-3 py-2 rounded-xl bg-blue-700 text-white hover:bg-blue-600 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Apply Filters
+              </button>
+            </div>
+          </section>
+
+          <!-- Performance mini panel -->
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Performance (mock)</h2>
+              <p class="text-xs text-slate-500 mt-1">Computed from the selected window.</p>
+            </div>
+
+            <div class="p-4 grid grid-cols-2 gap-2">
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[11px] text-slate-500">Max Drawdown</div>
+                <div class="mt-1 text-sm font-semibold mono" id="perfDrawdown">—</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[11px] text-slate-500">Sharpe</div>
+                <div class="mt-1 text-sm font-semibold mono" id="perfSharpe">—</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[11px] text-slate-500">Beta (vs S&P 500)</div>
+                <div class="mt-1 text-sm font-semibold mono" id="perfBeta">—</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[11px] text-slate-500">Hit Rate (Sells)</div>
+                <div class="mt-1 text-sm font-semibold mono" id="perfHitRate">—</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Transactions mini-table -->
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Recent Transactions</h2>
+              <p class="text-xs text-slate-500 mt-1">Latest 5 buys/sells.</p>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="min-w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                  <tr class="text-left text-[11px] font-semibold text-slate-600">
+                    <th class="px-4 py-3">Date</th>
+                    <th class="px-4 py-3">Type</th>
+                    <th class="px-4 py-3">Ticker</th>
+                    <th class="px-4 py-3 text-right">Amount</th>
+                    <th class="px-4 py-3 text-right">P&L</th>
+                  </tr>
+                </thead>
+                <tbody id="txBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 text-xs text-slate-500">
+              “Hit rate” counts profitable sells (if provided).
+            </div>
+          </section>
+        </aside>
+
+        <!-- RIGHT / CONTENT -->
+        <section class="lg:col-span-9 space-y-6">
+          <!-- KPI ROW 1 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="text-xs text-slate-500">Total Portfolio Value</div>
+              <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiTotalValue">—</div>
+              <div class="mt-3 flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-lg border" id="kpiValueDeltaBadge">—</span>
+                <span class="text-xs text-slate-500">vs prior day</span>
+              </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="text-xs text-slate-500">Cash Position</div>
+              <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiCash">—</div>
+              <div class="mt-3 flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 mono" id="kpiCashPct">—</span>
+                <span class="text-xs text-slate-500">of portfolio</span>
+              </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="text-xs text-slate-500">12M Volatility (ann.)</div>
+              <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiVolatility">—</div>
+              <div class="mt-3 flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-lg border mono" id="kpiVolDeltaBadge">—</span>
+                <span class="text-xs text-slate-500">Δ vs prior 12M</span>
+              </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+              <div class="text-xs text-slate-500">Total Return (range)</div>
+              <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiTotalReturn">—</div>
+              <div class="mt-3 flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-lg border mono" id="kpiTotalDeltaBadge">—</span>
+                <span class="text-xs text-slate-500">Δ vs S&P 500</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI ROW 2 -->
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 class="text-sm font-semibold text-slate-800">Returns vs Benchmark</h2>
+                <p class="text-xs text-slate-500 mt-1">All metrics update with the selected date range and filters.</p>
+              </div>
+              <div class="text-xs text-slate-500">
+                Benchmark: <span class="font-medium text-slate-700">S&P 500 (ticker-based if loaded)</span>
+              </div>
+            </div>
+            <div class="p-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3" id="kpiReturnRow2"></div>
+            </div>
+          </div>
+
+          <!-- CHARTS -->
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">Performance Over Time</h2>
+              <p class="text-xs text-slate-500 mt-1">
+                Absolute shows market value per series (currency) and benchmark as an index. % mode rebases everything to 0% at range start; line thickness encodes position size.
+              </p>
+            </div>
+
+            <div class="p-4 grid grid-cols-1 xl:grid-cols-12 gap-6">
+              <div class="xl:col-span-8">
+                <div class="h-[340px] sm:h-[400px]">
+                  <canvas id="lineChart"></canvas>
+                </div>
+                <div class="mt-3 text-xs text-slate-500 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <span class="inline-flex items-center gap-2">
+                    <span class="inline-block h-2 w-2 rounded-full bg-blue-700"></span> Portfolio
+                  </span>
+                  <span class="inline-flex items-center gap-2">
+                    <span class="inline-block h-2 w-2 rounded-full bg-slate-500"></span> Holdings
+                  </span>
+                  <span class="inline-flex items-center gap-2">
+                    <span class="inline-block h-2 w-2 rounded-full bg-slate-400"></span> Benchmark (dashed)
+                  </span>
+                </div>
+              </div>
+
+              <div class="xl:col-span-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h3 class="text-sm font-semibold text-slate-800">Allocation by Region</h3>
+                    <p class="text-xs text-slate-500 mt-1">Click a segment to filter holdings (click again to reset).</p>
+                  </div>
+                  <button id="resetAllocation"
+                    class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    Reset
+                  </button>
+                </div>
+
+                <div class="mt-3 h-[260px] sm:h-[300px]">
+                  <canvas id="donutChart"></canvas>
+                </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600" id="donutLegend"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TABLE -->
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-semibold text-slate-800">Top 10 Holdings</h2>
+                <p class="text-xs text-slate-500 mt-1">Search, sort, click a row for details.</p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <div class="relative">
+                  <input id="searchHoldings" type="text" placeholder="Search holdings…"
+                    class="text-sm bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200 w-44 sm:w-56" />
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">⌕</span>
+                </div>
+
+                <button id="downloadCsv"
+                  class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                  Download CSV
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="min-w-full">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                  <tr class="text-left text-xs font-semibold text-slate-600">
+                    <th class="px-4 py-3 cursor-pointer select-none" data-sort="ticker">Ticker <span class="text-slate-400" id="sort_ticker"></span></th>
+                    <th class="px-4 py-3 cursor-pointer select-none" data-sort="name">Name <span class="text-slate-400" id="sort_name"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="value">Market Value <span class="text-slate-400" id="sort_value"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="weight">Weight <span class="text-slate-400" id="sort_weight"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="ret12m">12M Return <span class="text-slate-400" id="sort_ret12m"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="contrib">Contribution <span class="text-slate-400" id="sort_contrib"></span></th>
+                    <th class="px-4 py-3 cursor-pointer select-none" data-sort="sector">Sector <span class="text-slate-400" id="sort_sector"></span></th>
+                  </tr>
+                </thead>
+                <tbody id="holdingsBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <span class="font-medium text-slate-700">Shareable state:</span>
+                <span class="text-slate-500">#start=…&end=…&currency=…&region=…&chartMode=…&benchmark=…</span>
+              </div>
+              <div class="text-slate-500">
+                Current: currency=<span class="font-medium text-slate-700" id="stateCurrency"></span>,
+                benchmark=<span class="font-medium text-slate-700" id="stateBenchmark"></span>,
+                region=<span class="font-medium text-slate-700" id="stateRegion"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- DETAILS DRAWER -->
+    <div id="drawerOverlay" class="fixed inset-0 bg-black/30 hidden z-50" aria-hidden="true"></div>
+
+    <aside id="detailsDrawer"
+      class="fixed top-0 right-0 h-full w-full sm:w-[420px] bg-white border-l border-slate-200 shadow-2xl translate-x-full drawer-transition z-50"
+      aria-labelledby="drawerTitle" role="dialog" aria-modal="true">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <div class="text-xs text-slate-500">Holding details</div>
+          <h3 id="drawerTitle" class="text-base font-semibold text-slate-900">—</h3>
+        </div>
+        <button id="closeDrawer"
+          class="text-sm px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+          Close
+        </button>
+      </div>
+
+      <div class="p-4 space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">Ticker</div>
+            <div class="mt-1 text-sm font-semibold mono" id="drawerTicker">—</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">Sector</div>
+            <div class="mt-1 text-sm font-semibold" id="drawerSector">—</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">Market Value</div>
+            <div class="mt-1 text-sm font-semibold mono" id="drawerValue">—</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500">Weight</div>
+            <div class="mt-1 text-sm font-semibold mono" id="drawerWeight">—</div>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs text-slate-500">Price change (mock if missing)</div>
+              <div class="mt-1 text-xl font-semibold mono" id="drawerPriceChange">—</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-slate-500">12M Return</div>
+              <div class="mt-1 text-xl font-semibold mono" id="drawerReturn">—</div>
+            </div>
+          </div>
+          <div class="mt-3 text-xs text-slate-500 leading-relaxed" id="drawerNotes">—</div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+          <h4 class="text-xs font-semibold text-slate-700">Trade summary (mock if missing)</h4>
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="text-[11px] text-slate-500">Avg buy price</div>
+              <div class="mt-1 text-sm font-semibold mono" id="drawerAvgBuy">—</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="text-[11px] text-slate-500">Current price</div>
+              <div class="mt-1 text-sm font-semibold mono" id="drawerCurPrice">—</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="text-[11px] text-slate-500">Realized P&L</div>
+              <div class="mt-1 text-sm font-semibold mono" id="drawerRealized">—</div>
+            </div>
+            <div class="p-3 rounded-xl bg-white border border-slate-200">
+              <div class="text-[11px] text-slate-500">Unrealized P&L</div>
+              <div class="mt-1 text-sm font-semibold mono" id="drawerUnrealized">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+const $=document.getElementById.bind(document);
+const c = (n,min,max)=>Math.max(min,Math.min(max,n));
+const p2 = (n)=>String(n).padStart(2,'0');
+function pc(n, digits=2){
+const nf = new Intl.NumberFormat('en-US', { style:'percent', maximumFractionDigits: digits });
+return nf.format(n);
+}
+function nu(n, digits=2){
+const nf = new Intl.NumberFormat('en-US', { maximumFractionDigits: digits });
+return nf.format(n);
+}
+function mo(n, currency){
+const nf = new Intl.NumberFormat('en-US', { style:'currency', currency, maximumFractionDigits: 0 });
+return nf.format(n);
+}
+function bc(value){
+if (value >= 0) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+return 'bg-rose-50 text-rose-700 border-rose-200';
+}
+function dl(filename, text) {
+const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+const a = document.createElement('a');
+a.href = URL.createObjectURL(blob);
+a.download = filename;
+document.body.appendChild(a);
+a.click();
+setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+function lu() {
+const d = new Date();
+$('lastUpdated').textContent =
+`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+function th(params){
+const pairs = Object.entries(params)
+.filter(([_,v]) => v !== undefined && v !== null && v !== '')
+.map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
+return '#' + pairs.join('&');
+}
+function fh(){
+const h = (location.hash || '').replace(/^#/, '');
+const out = {};
+if(!h) return out;
+h.split('&').forEach(kv => {
+const [k,v] = kv.split('=');
+if(k) out[decodeURIComponent(k)] = decodeURIComponent(v || '');
+});
+return out;
+}
+function ms(date){ return new Date(date.getFullYear(), date.getMonth(), 1); }
+function am(d, m){ return new Date(d.getFullYear(), d.getMonth()+m, 1); }
+function em(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59, 999); }
+const TODAY = new Date();
+const END_MONTH_DATE = ms(TODAY);
+const START_MONTH_DATE = am(END_MONTH_DATE, -59);
+const M = Array.from({length: 60}, (_, i) => {
+const dt = am(START_MONTH_DATE, i);
+const label = dt.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+return { i, dt, label };
+});
+function miS(i){ return ms(M[c(i,0,59)].dt); }
+function miE(i){ return em(M[c(i,0,59)].dt); }
+function wd(d){ const day = d.getDay(); return day !== 0 && day !== 6; }
+function bbd(startDate, endDate){
+const days = [];
+const d = new Date(startDate); d.setHours(0,0,0,0);
+const e = new Date(endDate);   e.setHours(0,0,0,0);
+while (d <= e) {
+if (wd(d)) days.push(new Date(d));
+d.setDate(d.getDate()+1);
+}
+return days;
+}
+const FULL_START = miS(0);
+const FULL_END = miE(59);
+const B = bbd(FULL_START, FULL_END);
+function iA(date){
+const t = date.getTime();
+for (let i=0;i<B.length;i++){
+if (B[i].getTime() >= t) return i;
+}
+return 0;
+}
+function iB(date){
+const t = date.getTime();
+for (let i=B.length-1;i>=0;i--){
+if (B[i].getTime() <= t) return i;
+}
+return B.length-1;
+}
+function hs(str){
+let h = 2166136261;
+for (let i=0;i<str.length;i++){
+h ^= str.charCodeAt(i);
+h = Math.imul(h, 16777619);
+}
+return (h >>> 0);
+}
+function sp(sector){
+if (sector === 'Semiconductors') return { drift: 0.00045, vol: 0.020 };
+if (sector === 'Technology')     return { drift: 0.00038, vol: 0.017 };
+if (sector === 'Consumer')       return { drift: 0.00030, vol: 0.015 };
+if (sector === 'Financials')     return { drift: 0.00026, vol: 0.014 };
+if (sector === 'Healthcare')     return { drift: 0.00022, vol: 0.012 };
+if (sector === 'Staples')        return { drift: 0.00018, vol: 0.010 };
+if (sector === 'ETF')            return { drift: 0.00024, vol: 0.011 };
+return { drift: 0.00025, vol: 0.013 };
+}
+function gps(ticker, sector){
+const seed = hs(ticker);
+const p = sp(sector || 'Other');
+let price = 40 + (seed % 260);
+const out = new Array(B.length);
+for (let i=0; i<B.length; i++){
+const s1 = Math.sin((i + (seed % 97)) * 0.19);
+const s2 = Math.cos((i + (seed % 57)) * 0.07);
+const s3 = Math.sin((i + (seed % 31)) * 0.013);
+const noise = (s1 * 0.55 + s2 * 0.35 + s3 * 0.25);
+const dailyRet = p.drift + noise * (p.vol * 0.0018);
+price = Math.max(1, price * (1 + dailyRet));
+out[i] = price;
+}
+return out;
+}
+function gbs(){
+let idx = 100;
+const out = new Array(B.length);
+for (let i=0;i<B.length;i++){
+const s1 = Math.sin(i * 0.17) * 0.6;
+const s2 = Math.cos(i * 0.05) * 0.4;
+const s3 = Math.sin(i * 0.011) * 0.3;
+const noise = (s1 + s2 + s3);
+const drift = 0.00028;
+const vol = 0.012;
+const ret = drift + noise * (vol * 0.0018);
+idx = Math.max(10, idx * (1 + ret));
+out[i] = idx;
+}
+return out;
+}
+const D = {
+usingRealData: false,
+cashEUR: null,              // if holdings.csv includes CASH row
+holdings: [],
+transactions: [],
+fullPrice: new Map(),       // ticker -> price array aligned to B
+fullValueEUR: new Map(),    // ticker -> value array in EUR aligned to B
+fullBench: [],              // benchmark index series aligned to B
+benchSymbol: 'SPY'
+};
+function ld(){
+D.usingRealData=0;D.cashEUR=null;D.benchSymbol='SPY';
+const H=(ticker,name,valueEUR,sector,region,account,ret12m,contrib,avgBuy,curPrice,realized,notes)=>({ticker,name,valueEUR,sector,region,account,ret12m,contrib,avgBuy,curPrice,realized,notes});
+D.holdings=[
+H('AAPL','Apple Inc.',128400,'Technology','Americas','Broker A',.172,.018,155,187,1800,'Quality megacap; valuation risk.'),
+H('MSFT','Microsoft',117900,'Technology','Americas','Broker A',.141,.014,310,366,1200,'Cloud/AI tailwinds; premium.'),
+H('NVDA','NVIDIA',103600,'Semiconductors','Americas','Broker B',.268,.02,420,540,2600,'High vol; position sizing.'),
+H('ASML','ASML Holding',89200,'Semiconductors','Europe','Broker B',.109,.008,620,690,900,'EUV moat; cycle/geopolitics.'),
+H('V','Visa',76400,'Financials','Americas','Pension',.124,.008,215,241,500,'Payments tailwinds; regulation.'),
+H('UL','Unilever',59800,'Staples','Europe','Broker A',.067,.003,45,48,350,'Defensive; FX sensitivity.'),
+H('AMZN','Amazon',57200,'Consumer','Americas','Broker B',.153,.007,120,139,0,'AWS + retail leverage.'),
+H('NVS','Novartis',54400,'Healthcare','Europe','Pension',.052,.002,89,93,240,'Pipeline + patent cliffs.'),
+H('LVMH','LVMH',49800,'Consumer','Europe','Broker A',.088,.004,640,705,620,'Luxury cycle; China risk.'),
+H('CORE','Global Equity ETF',47200,'ETF','Other','All',.093,.004,92,101,0,'Broad diversification.')
+];
+D.transactions=[
+['2025-11-12','BUY','ASML',9500,null],
+['2025-10-03','SELL','AAPL',6200,780],
+['2025-09-18','BUY','CORE',4200,null],
+['2025-08-07','SELL','NVDA',5100,920],
+['2025-07-21','BUY','MSFT',8300,null]
+].map(([date,type,ticker,amountEUR,pnlEUR])=>({date,type,ticker,amountEUR,pnlEUR}));
+D.fullPrice=new Map();D.fullValueEUR=new Map();
+for(const h of D.holdings){const p=gps(h.ticker,h.sector);D.fullPrice.set(h.ticker,p);const sh=h.valueEUR/p[p.length-1];D.fullValueEUR.set(h.ticker,p.map(x=>x*sh));}
+D.fullBench=gbs();sdp();
+}
+D.fullBench = gbs();
+sdp();
+}
+function csv(text){
+const rows = [];
+let row = [];
+let field = '';
+let inQuotes = false;
+for (let i=0; i<text.length; i++){
+const c = text[i];
+if (inQuotes){
+if (c === '"'){
+if (text[i+1] === '"'){ field += '"'; i++; }
+else inQuotes = false;
+} else field += c;
+} else {
+if (c === '"') inQuotes = true;
+else if (c === ','){ row.push(field); field = ''; }
+else if (c === '\n'){
+row.push(field);
+if (row.some(x => (x||'').trim() !== '')) rows.push(row);
+row = []; field = '';
+} else if (c === '\r'){  }
+else field += c;
+}
+}
+row.push(field);
+if (row.some(x => (x||'').trim() !== '')) rows.push(row);
+return rows;
+}
+function nk(k){
+return (k || '').trim().toLowerCase().replace(/\s+/g,'').replace(/[_-]/g,'');
+}
+function tn(x){
+if (x == null) return null;
+const s = String(x).trim();
+if (!s) return null;
+const cleaned = s
+.replace(/[€$£]/g,'')
+.replace(/\s/g,'')
+.replace(/%/g,'');
+const eu = /^[0-9]{1,3}(\.[0-9]{3})+(,[0-9]+)?$/.test(cleaned);
+if (eu){
+const t = cleaned.replace(/\./g,'').replace(',','.');
+const v = Number(t);
+return Number.isFinite(v) ? v : null;
+}
+const t = cleaned.replace(/,/g,'');
+const v = Number(t);
+return Number.isFinite(v) ? v : null;
+}
+function rft(file){
+return new Promise((resolve, reject) => {
+const fr = new FileReader();
+fr.onload = () => resolve(String(fr.result || ''));
+fr.onerror = () => reject(fr.error);
+fr.readAsText(file);
+});
+}
+function di(d){
+return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+}
+function pid(s){
+const t = String(s || '').trim();
+const m = t.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})$/);
+if (!m) return null;
+const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+if (Number.isNaN(d.getTime())) return null;
+d.setHours(0,0,0,0);
+return d;
+}
+function asbd(pointsMap){
+let last = null;
+let first = null;
+for (const d of B){
+const iso = di(d);
+if (pointsMap.has(iso)){
+first = pointsMap.get(iso);
+break;
+}
+}
+if (first == null){
+return null;
+}
+const out = new Array(B.length);
+for (let i=0; i<B.length; i++){
+const iso = di(B[i]);
+if (pointsMap.has(iso)) last = pointsMap.get(iso);
+if (last == null) last = first;
+out[i] = last;
+}
+return out;
+}
+function r12(valueSeries){
+const e = valueSeries.length - 1;
+const s = Math.max(0, e - 252);
+const a = valueSeries[s] || 1;
+const b = valueSeries[e] || 1;
+return a === 0 ? 0 : (b / a) - 1;
+}
+function lhc(csvText){
+const rows = csv(csvText);
+if (!rows.length) throw new Error('Holdings CSV is empty.');
+const header = rows[0].map(nk);
+const idx = (key, alts=[]) => {
+const keys = [key, ...alts].map(nk);
+for (const k of keys){
+const i = header.indexOf(k);
+if (i >= 0) return i;
+}
+return -1;
+};
+const iTicker = idx('ticker');
+const iName = idx('name');
+const iVal  = idx('marketvalue', ['value','marketval','mv']);
+const iSector = idx('sector');
+const iRegion = idx('region');
+const iAccount = idx('account');
+const iAvgBuy = idx('avgbuy', ['avgprice','avgcost']);
+const iCurPrice = idx('curprice', ['currentprice','price']);
+const iRet12m = idx('ret12m', ['return12m','12mreturn']);
+const iContrib = idx('contrib', ['contribution']);
+const iRealized = idx('realized', ['realizedpnl']);
+const iNotes = idx('notes', ['note','comment']);
+if (iTicker < 0 || iName < 0 || iVal < 0){
+throw new Error('Holdings CSV missing required columns. Required: ticker, name, marketValue.');
+}
+const holdings = [];
+let cashEUR = null;
+for (let r=1; r<rows.length; r++){
+const row = rows[r];
+const ticker = (row[iTicker] || '').trim();
+const name = (row[iName] || '').trim();
+const mv = tn(row[iVal]);
+if (!ticker || !name || mv == null) continue;
+if (ticker.toUpperCase() === 'CASH' || name.toLowerCase() === 'cash'){
+cashEUR = mv;
+continue;
+}
+holdings.push({
+ticker: ticker.toUpperCase(),
+name,
+valueEUR: mv,
+sector: (iSector >= 0 ? (row[iSector] || '').trim() : '') || 'Other',
+region: (iRegion >= 0 ? (row[iRegion] || '').trim() : '') || 'Other',
+account: (iAccount >= 0 ? (row[iAccount] || '').trim() : '') || 'All',
+avgBuy: iAvgBuy >= 0 ? (tn(row[iAvgBuy]) ?? null) : null,
+curPrice: iCurPrice >= 0 ? (tn(row[iCurPrice]) ?? null) : null,
+ret12m: iRet12m >= 0 ? ((tn(row[iRet12m]) ?? null) / (String(row[iRet12m]||'').includes('%') ? 100 : 1)) : null,
+contrib: iContrib >= 0 ? ((tn(row[iContrib]) ?? null) / (String(row[iContrib]||'').includes('%') ? 100 : 1)) : null,
+realized: iRealized >= 0 ? (tn(row[iRealized]) ?? null) : null,
+notes: (iNotes >= 0 ? (row[iNotes] || '').trim() : '') || ''
+});
+}
+if (!holdings.length) throw new Error('Holdings CSV produced 0 valid rows.');
+return { holdings, cashEUR };
+}
+function lpc(csvText){
+const rows = csv(csvText);
+if (!rows.length) throw new Error('Prices CSV is empty.');
+const header = rows[0].map(nk);
+const iDate = header.indexOf('date');
+const iTicker = header.indexOf('ticker');
+const iClose = header.indexOf('close');
+if (iDate < 0 || iTicker < 0 || iClose < 0){
+throw new Error('Prices CSV must be long format: date,ticker,close');
+}
+const byTicker = new Map();
+let loadedPoints = 0;
+for (let r=1; r<rows.length; r++){
+const row = rows[r];
+const d = pid(row[iDate]);
+const t = String(row[iTicker] || '').trim().toUpperCase();
+const c = tn(row[iClose]);
+if (!d || !t || c == null) continue;
+const iso = di(d);
+if (!byTicker.has(t)) byTicker.set(t, new Map());
+byTicker.get(t).set(iso, c);
+loadedPoints++;
+}
+if (!loadedPoints) throw new Error('Prices CSV contained no usable rows.');
+return byTicker;
+}
+function ltc(csvText){
+const rows = csv(csvText);
+if (!rows.length) return [];
+const header = rows[0].map(nk);
+const iDate = header.indexOf('date');
+const iType = header.indexOf('type');
+const iTicker = header.indexOf('ticker');
+const iAmount = header.indexOf('amount',) >= 0 ? header.indexOf('amount') : header.indexOf('amounteur');
+const iPnl = header.indexOf('pnl') >= 0 ? header.indexOf('pnl') : header.indexOf('pnleur');
+if (iDate < 0 || iType < 0 || iTicker < 0 || iAmount < 0) return [];
+const out = [];
+for (let r=1; r<rows.length; r++){
+const row = rows[r];
+const date = String(row[iDate] || '').trim();
+const type = String(row[iType] || '').trim().toUpperCase();
+const ticker = String(row[iTicker] || '').trim().toUpperCase();
+const amount = tn(row[iAmount]);
+const pnl = iPnl >= 0 ? tn(row[iPnl]) : null;
+if (!date || !type || !ticker || amount == null) continue;
+out.push({
+date,
+type: (type === 'SELL' ? 'SELL' : 'BUY'),
+ticker,
+amountEUR: amount,
+pnlEUR: (pnl == null ? null : pnl)
+});
+}
+return out;
+}
+function rsp(holdings, pricesByTicker, cashEUR, benchSymbol){
+const fullPrice = new Map();
+const fullValueEUR = new Map();
+for (const h of holdings){
+const points = pricesByTicker && pricesByTicker.get(h.ticker) ? pricesByTicker.get(h.ticker) : null;
+let aligned = null;
+if (points){
+aligned = asbd(points);
+}
+if (!aligned){
+aligned = gps(h.ticker, h.sector);
+}
+fullPrice.set(h.ticker, aligned);
+const lastP = aligned[aligned.length-1] || 1;
+const shares = h.valueEUR / lastP;
+fullValueEUR.set(h.ticker, aligned.map(p => p * shares));
+}
+let bench = null;
+if (pricesByTicker && benchSymbol && pricesByTicker.get(benchSymbol.toUpperCase())){
+const bAligned = asbd(pricesByTicker.get(benchSymbol.toUpperCase()));
+if (bAligned) {
+const first = bAligned[0] || 1;
+bench = bAligned.map(v => 100 * (v / first));
+}
+}
+if (!bench) bench = gbs();
+return { fullPrice, fullValueEUR, bench, cashEUR: (cashEUR == null ? null : cashEUR) };
+}
+async function llc(){
+const holdingsFile = $('holdingsFile').files[0] || null;
+const pricesFile = $('pricesFile').files[0] || null;
+const txFile = $('txFile').files[0] || null;
+const benchSymbol = ($('benchmarkSymbol').value || 'SPY').trim().toUpperCase();
+if (!holdingsFile){
+ss('Please choose a holdings.csv first.', true);
+return;
+}
+try {
+ss('Loading CSV files…', false);
+const holdingsText = await rft(holdingsFile);
+const { holdings, cashEUR } = lhc(holdingsText);
+let pricesByTicker = null;
+if (pricesFile){
+const pricesText = await rft(pricesFile);
+pricesByTicker = lpc(pricesText);
+}
+let transactions = [];
+if (txFile){
+const txText = await rft(txFile);
+transactions = ltc(txText);
+}
+const built = rsp(holdings, pricesByTicker, cashEUR, benchSymbol);
+for (const h of holdings){
+const vSeries = built.fullValueEUR.get(h.ticker);
+const pSeries = built.fullPrice.get(h.ticker);
+if (h.ret12m == null) h.ret12m = r12(vSeries);
+if (h.contrib == null) h.contrib = h.ret12m * 0.08; // simple mock mapping if not provided
+if (h.curPrice == null) h.curPrice = pSeries[pSeries.length-1];
+if (h.avgBuy == null) h.avgBuy = h.curPrice / (1 + (h.ret12m || 0)); // rough back-calc
+if (!h.notes) h.notes = 'Loaded from holdings.csv (notes not provided).';
+if (h.realized == null) h.realized = 0;
+}
+D.usingRealData = true;
+D.cashEUR = built.cashEUR;
+D.holdings = holdings;
+D.transactions = transactions.length ? transactions : D.transactions; // fallback to dummy tx if none provided
+D.fullPrice = built.fullPrice;
+D.fullValueEUR = built.fullValueEUR;
+D.fullBench = built.bench;
+D.benchSymbol = benchSymbol;
+lu();
+sdp();
+const msg = [
+`Loaded holdings: ${holdings.length} tickers`,
+pricesFile ? 'Loaded prices.csv (aligned to last 5Y business days)' : 'No prices.csv → using deterministic fallback history',
+(cashEUR != null) ? `Cash row detected: ${cashEUR.toFixed(0)} (assumed EUR)` : 'No cash row → cash % is estimated',
+txFile ? `Loaded transactions: ${transactions.length}` : 'No transactions.csv'
+].join(' • ');
+ss(msg, false);
+rtx();
+ua();
+} catch (err){
+ss(`Error: ${err.message || String(err)}`, true);
+}
+}
+function ss(text, isError){
+const el = $('loadStatus');
+el.textContent = text;
+el.className = 'mt-1 text-xs ' + (isError ? 'text-rose-700' : 'text-slate-700');
+}
+function sdp(){
+const pill = $('dataPill');
+if (D.usingRealData){
+pill.className = 'inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800';
+pill.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-600"></span> Real data (local CSV)';
+} else {
+pill.className = 'inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800';
+pill.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-500"></span> Dummy data';
+}
+}
+const S = {
+currency: 'EUR',
+benchmarkOn: true,
+chartMode: 'abs', // 'abs' | 'pc'
+theme: 'light',
+region: 'All',
+sector: 'All',
+account: 'All',
+search: '',
+sortKey: 'value',
+sortDir: 'desc',
+startMonth: 48,
+endMonth: 59
+};
+function fr(currency){ return currency === 'USD' ? 1.09 : 1.0; }
+function wds(){
+let s = c(S.startMonth, 0, 59);
+let e = c(S.endMonth, 0, 59);
+if (s > e) { const tmp = s; s = e; e = tmp; }
+const start = miS(s);
+const end = miE(e);
+return { sMonth:s, eMonth:e, start, end };
+}
+function cw(){
+const { start, end, sMonth, eMonth } = wds();
+const startIdx = iA(start);
+const endIdx = iB(end);
+return { startIdx, endIdx, sMonth, eMonth, start, end };
+}
+function hf(includeSearch=true){
+const q = includeSearch ? (S.search || '').toLowerCase().trim() : '';
+return D.holdings
+.filter(h => S.region === 'All' ? true : h.region === S.region)
+.filter(h => S.sector === 'All' ? true : h.sector === S.sector)
+.filter(h => S.account === 'All' ? true : (h.account === S.account || h.account === 'All'))
+.filter(h => {
+if(!q) return true;
+return h.ticker.toLowerCase().includes(q) ||
+h.name.toLowerCase().includes(q) ||
+(h.sector||'').toLowerCase().includes(q) ||
+(h.region||'').toLowerCase().includes(q);
+});
+}
+function cwts(rows, endIdx){
+const total = rows.reduce((s,h)=>s + (D.fullValueEUR.get(h.ticker)?.[endIdx] || 0), 0) || 1;
+return rows.map(h => ({ ...h, weight: (D.fullValueEUR.get(h.ticker)?.[endIdx] || 0) / total }));
+}
+function cph(){
+const base = 0.040;
+const mod =
+(S.account === 'Pension' ? 0.010 : 0) +
+(S.sector === 'Technology' ? -0.004 : 0) +
+(S.region === 'Europe' ? 0.002 : 0);
+return c(base + mod, 0.01, 0.12);
+}
+function pse(rows, startIdx, endIdx){
+const holdingsSum = [];
+for (let i=startIdx; i<=endIdx; i++){
+let s = 0;
+for (const h of rows) s += (D.fullValueEUR.get(h.ticker)?.[i] || 0);
+holdingsSum.push(s);
+}
+let cashSeries = null;
+if (D.cashEUR != null){
+cashSeries = holdingsSum.map(_ => D.cashEUR);
+} else {
+const c = cph();
+cashSeries = holdingsSum.map(v => v * c);
+}
+const port = holdingsSum.map((v,i)=> v + cashSeries[i]);
+const endHold = holdingsSum[holdingsSum.length-1] || 1;
+const endCash = cashSeries[cashSeries.length-1] || 0;
+const cashPct = endCash / (endHold + endCash);
+return { portEUR: port, cashEURSeries: cashSeries, cashPct };
+}
+function pse0(rows, endIdx){
+const out = [];
+for (let i=0;i<=endIdx;i++){
+let s = 0;
+for (const h of rows) s += (D.fullValueEUR.get(h.ticker)?.[i] || 0);
+out.push(s);
+}
+if (D.cashEUR != null){
+return out.map(v => v + D.cashEUR);
+}
+const c = cph();
+return out.map(v => v + v*c);
+}
+function rb(series, idxFrom, idxTo){
+const a = series[c(idxFrom, 0, series.length-1)];
+const b = series[c(idxTo,   0, series.length-1)];
+return a === 0 ? 0 : (b / a) - 1;
+}
+function cv(series, endIdx, window=252){
+const e = c(endIdx, 1, series.length-1);
+const s = Math.max(1, e - window);
+const rets = [];
+for (let i=s; i<=e; i++){
+rets.push((series[i] / series[i-1]) - 1);
+}
+const mean = rets.reduce((a,x)=>a+x,0) / (rets.length || 1);
+const varr = rets.reduce((a,x)=>a+Math.pow(x-mean,2),0) / (rets.length || 1);
+return Math.sqrt(varr) * Math.sqrt(252);
+}
+function md(series, sIdx, eIdx){
+let peak = series[sIdx];
+let mdd = 0;
+for (let i=sIdx;i<=eIdx;i++){
+peak = Math.max(peak, series[i]);
+const dd = (series[i] / peak) - 1;
+if (dd < mdd) mdd = dd;
+}
+return mdd;
+}
+function sr(series, sIdx, eIdx){
+const total = rb(series, sIdx, eIdx);
+const days = Math.max(2, eIdx - sIdx + 1);
+const ann = Math.pow(1 + total, 252 / days) - 1;
+const vol = cv(series, eIdx, Math.min(252, days-1));
+const rf = 0.02;
+return (ann - rf) / (vol || 1);
+}
+function bm(){
+const base = 1.03;
+const b = c(
+base +
+(S.sector === 'Technology' ? 0.10 : 0) +
+(S.sector === 'Semiconductors' ? 0.15 : 0) +
+(S.sector === 'Staples' ? -0.12 : 0) +
+(S.sector === 'Healthcare' ? -0.08 : 0) +
+(S.region === 'Europe' ? -0.05 : 0),
+0.60, 1.60
+);
+return b;
+}
+function rkr(items){
+const el = $('kpiReturnRow2');
+el.innerHTML = items.map(x => `
+<div class="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+<div class="text-[11px] text-slate-500">${x.label}</div>
+<div class="mt-1 flex items-baseline justify-between gap-2">
+<div class="text-sm font-semibold mono text-slate-900">${x.port>=0?'+':''}${pc(x.port,2)}</div>
+<div class="text-[11px] px-2 py-1 rounded-lg border ${bc(x.delta)} mono">${x.delta>=0?'+':''}${pc(x.delta,2)}</div>
+</div>
+<div class="mt-1 text-[11px] text-slate-500">Δ vs Benchmark</div>
+</div>
+`).join('');
+}
+function rk(rowsForAll, win){
+const fx = fr(S.currency);
+const { portEUR, cashEURSeries, cashPct } = pse(rowsForAll, win.startIdx, win.endIdx);
+const port = portEUR.map(v => v * fx);
+const last = port[port.length-1];
+const prev = port[Math.max(0, port.length-2)];
+const deltaDay = (last/prev) - 1;
+$('kpiTotalValue').textContent = mo(last, S.currency);
+const valBadge = $('kpiValueDeltaBadge');
+valBadge.className = `text-xs px-2 py-1 rounded-lg border ${bc(deltaDay)} mono`;
+valBadge.textContent = `${deltaDay>=0?'+':''}${pc(deltaDay,2)}`;
+const cash = (cashEURSeries[cashEURSeries.length-1] || 0) * fx;
+$('kpiCash').textContent = mo(cash, S.currency);
+$('kpiCashPct').textContent = pc(cashPct, 1);
+const fullPortEUR = pse0(rowsForAll, win.endIdx);
+const endIdxFull = fullPortEUR.length - 1;
+const vol12 = cv(fullPortEUR, endIdxFull, 252);
+const volPrior = cv(fullPortEUR, Math.max(1, endIdxFull - 252), 252);
+const volDelta = vol12 - volPrior;
+$('kpiVolatility').textContent = pc(vol12, 2);
+const volBadge = $('kpiVolDeltaBadge');
+volBadge.className = `text-xs px-2 py-1 rounded-lg border ${bc(volDelta)} mono`;
+volBadge.textContent = `${volDelta>=0?'+':''}${pc(volDelta,2)}`;
+const benchWin = D.fullBench.slice(win.startIdx, win.endIdx+1);
+const totalRet = rb(portEUR, 0, portEUR.length-1);
+const benchRet = rb(benchWin, 0, benchWin.length-1);
+const deltaBench = totalRet - benchRet;
+$('kpiTotalReturn').textContent = `${totalRet>=0?'+':''}${pc(totalRet,2)}`;
+const totalBadge = $('kpiTotalDeltaBadge');
+totalBadge.className = `text-xs px-2 py-1 rounded-lg border ${bc(deltaBench)} mono`;
+totalBadge.textContent = `${deltaBench>=0?'+':''}${pc(deltaBench,2)}`;
+const endGlobal = win.endIdx;
+const startGlobal = win.startIdx;
+const clampStart = (idx) => Math.max(startGlobal, idx);
+const idxDaysBack = (days) => clampStart(Math.max(0, endGlobal - days));
+const idxMonthsBack = (months) => {
+const endDate = B[endGlobal];
+const target = new Date(endDate.getFullYear(), endDate.getMonth() - months, endDate.getDate());
+return clampStart(iB(target));
+};
+const mk = (label, fromIdxGlobal) => {
+const fromLocal = fromIdxGlobal - startGlobal;
+const portR = rb(portEUR, fromLocal, portEUR.length-1);
+const benchR = rb(benchWin, fromLocal, benchWin.length-1);
+return { label, port: portR, delta: portR - benchR };
+};
+rkr([
+mk('1Y', idxMonthsBack(12)),
+mk('1Q', idxMonthsBack(3)),
+mk('1M', idxMonthsBack(1)),
+mk('1W', idxDaysBack(5)),
+mk('1D', idxDaysBack(1))
+]);
+}
+function rpp(rowsForAll, win){
+const { portEUR } = pse(rowsForAll, win.startIdx, win.endIdx);
+const mdd = md(portEUR, 0, portEUR.length-1);
+const sh = sr(portEUR, 0, portEUR.length-1);
+const beta = bm();
+const sells = D.transactions.filter(t => t.type === 'SELL');
+const wins = sells.filter(t => (t.pnlEUR || 0) > 0);
+const hit = sells.length ? wins.length / sells.length : 0;
+$('perfDrawdown').textContent = pc(mdd, 1);
+$('perfSharpe').textContent = nu(sh, 2);
+$('perfBeta').textContent = nu(beta, 2);
+$('perfHitRate').textContent = pc(hit, 0);
+}
+function rtx(){
+const fx = fr(S.currency);
+const rows = (D.transactions || []).slice(0,5).map(t => ({
+...t,
+amount: (t.amountEUR || 0) * fx,
+pnl: t.pnlEUR == null ? null : t.pnlEUR * fx
+}));
+const body = $('txBody');
+body.innerHTML = rows.map(t => {
+const typeBadge = t.type === 'BUY'
+? 'bg-blue-50 text-blue-800 border-blue-200'
+: 'bg-blue-700 text-white border-blue-700';
+const pnlBadge = t.pnl == null
+? `<span class="text-[11px] text-slate-400">—</span>`
+: `<span class="text-[11px] px-2 py-1 rounded-lg border ${bc(t.pnl)} mono">${t.pnl>=0?'+':''}${mo(t.pnl, S.currency)}</span>`;
+return `
+<tr class="hover:bg-slate-50">
+<td class="px-4 py-3 text-xs text-slate-700 mono">${t.date || '—'}</td>
+<td class="px-4 py-3"><span class="text-[11px] px-2 py-1 rounded-lg border ${typeBadge}">${t.type}</span></td>
+<td class="px-4 py-3 text-xs font-semibold text-slate-900">${t.ticker || '—'}</td>
+<td class="px-4 py-3 text-xs text-slate-700 text-right mono">${mo(t.amount || 0, S.currency)}</td>
+<td class="px-4 py-3 text-right">${pnlBadge}</td>
+</tr>
+`;
+}).join('');
+}
+const donutColors = ["#1d4ed8", "#3b82f6", "#60a5fa", "#94a3b8"];
+let donutChart = null;
+function ca(rows, endIdx){
+const totals = { Americas:0, Europe:0, APAC:0, Other:0 };
+rows.forEach(h => {
+const v = (D.fullValueEUR.get(h.ticker)?.[endIdx] || 0);
+totals[h.region] = (totals[h.region] || 0) + v;
+});
+const sum = Object.values(totals).reduce((s,x)=>s+x,0) || 1;
+return [
+{ label:'Americas', value: totals.Americas / sum },
+{ label:'Europe',   value: totals.Europe   / sum },
+{ label:'APAC',     value: totals.APAC     / sum },
+{ label:'Other',    value: totals.Other    / sum }
+];
+}
+function rdl(alloc){
+const el = $('donutLegend');
+el.innerHTML = alloc.map((a, i) => `
+<div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200">
+<div class="flex items-center gap-2">
+<span class="inline-block h-2.5 w-2.5 rounded-full" style="background:${donutColors[i]}"></span>
+<span class="font-medium text-slate-700">${a.label}</span>
+</div>
+<span class="mono text-slate-700">${pc(a.value, 0)}</span>
+</div>
+`).join('');
+}
+function rd(rows, endIdx){
+const alloc = ca(rows, endIdx);
+const labels = alloc.map(a=>a.label);
+const valuesPct = alloc.map(a=>Math.round(a.value*1000)/10);
+const ctx = $('donutChart').getContext('2d');
+if (donutChart) donutChart.destroy();
+donutChart = new Chart(ctx, {
+type: 'doughnut',
+data: {
+labels,
+datasets: [{
+data: valuesPct,
+backgroundColor: donutColors,
+borderColor: (S.theme === 'dark') ? "#0b1220" : "#ffffff",
+borderWidth: 2,
+hoverOffset: 6
+}]
+},
+options: {
+responsive: true,
+maintainAspectRatio: false,
+cutout: '68%',
+plugins: {
+legend: { display: false },
+tooltip: { callbacks: { label: (c)=>`${c.label}: ${c.parsed}%` } }
+},
+onClick: (_, elements) => {
+if (!elements || !elements.length) return;
+const idx = elements[0].index;
+const clicked = labels[idx];
+S.region = (S.region === clicked) ? 'All' : clicked;
+$('selectedRegionLabel').textContent = S.region;
+shs();
+ua();
+}
+}
+});
+rdl(alloc);
+}
+function so(rows){
+const key = S.sortKey;
+const dir = S.sortDir === 'asc' ? 1 : -1;
+const getter = (r) => {
+if (key === 'ticker') return r.ticker;
+if (key === 'name') return r.name;
+if (key === 'sector') return r.sector;
+if (key === 'value') return r.valueEUR;
+if (key === 'weight') return r.weight;
+if (key === 'ret12m') return r.ret12m;
+if (key === 'contrib') return r.contrib;
+return r.valueEUR;
+};
+return [...rows].sort((a,b) => {
+const A = getter(a), B = getter(b);
+if (typeof A === 'string') return A.localeCompare(B) * dir;
+return (A - B) * dir;
+});
+}
+function csi(){
+['ticker','name','value','weight','ret12m','contrib','sector'].forEach(k => {
+const el = $('sort_'+k);
+if (el) el.textContent = '';
+});
+}
+function ssi(key){
+csi();
+const el = $('sort_'+key);
+if (!el) return;
+el.textContent = S.sortDir === 'asc' ? ' ▲' : ' ▼';
+}
+function rht(rows){
+const fx = fr(S.currency);
+const tbody = $('holdingsBody');
+tbody.innerHTML = rows.map((h, idx) => {
+const retBadge = `<span class="text-xs px-2 py-1 rounded-lg border ${bc(h.ret12m || 0)} mono">${(h.ret12m||0)>=0?'+':''}${pc(h.ret12m||0,2)}</span>`;
+const contribBadge = `<span class="text-xs px-2 py-1 rounded-lg border bg-blue-50 text-blue-800 border-blue-200 mono">${(h.contrib||0)>=0?'+':''}${pc(h.contrib||0,2)}</span>`;
+return `
+<tr class="hover:bg-slate-50 cursor-pointer" data-row="${idx}">
+<td class="px-4 py-3 text-sm font-semibold text-slate-900">${h.ticker}</td>
+<td class="px-4 py-3 text-sm text-slate-700">${h.name}</td>
+<td class="px-4 py-3 text-sm text-slate-700 text-right mono">${mo((h.valueEUR||0)*fx, S.currency)}</td>
+<td class="px-4 py-3 text-sm text-slate-700 text-right mono">${pc(h.weight||0,1)}</td>
+<td class="px-4 py-3 text-right">${retBadge}</td>
+<td class="px-4 py-3 text-right">${contribBadge}</td>
+<td class="px-4 py-3 text-sm text-slate-600">${h.sector || 'Other'}</td>
+</tr>
+`;
+}).join('');
+Array.from(tbody.querySelectorAll('tr[data-row]')).forEach((tr, i) => {
+tr.addEventListener('click', () => od(rows[i]));
+});
+}
+function ehc(rows){
+const fx = fr(S.currency);
+const header = ['Ticker','Name','MarketValue','Weight','Return12M','Contribution','Sector','Region','Account'];
+const lines = [header.join(',')];
+rows.forEach(h => {
+const line = [
+h.ticker,
+`"${String(h.name||'').replace(/"/g,'""')}"`,
+((h.valueEUR||0)*fx).toFixed(0),
+(h.weight||0).toFixed(4),
+(h.ret12m||0).toFixed(4),
+(h.contrib||0).toFixed(4),
+`"${h.sector||''}"`,
+`"${h.region||''}"`,
+`"${h.account||''}"`
+];
+lines.push(line.join(','));
+});
+dl('holdings.csv', lines.join('\n'));
+}
+const drawer = $('detailsDrawer');
+const overlay = $('drawerOverlay');
+function od(h){
+const fx = fr(S.currency);
+$('drawerTitle').textContent = `${h.name || '—'}`;
+$('drawerTicker').textContent = h.ticker || '—';
+$('drawerSector').textContent = h.sector || '—';
+$('drawerValue').textContent = mo((h.valueEUR||0)*fx, S.currency);
+$('drawerWeight').textContent = pc(h.weight||0, 2);
+const avgBuy = (h.avgBuy == null ? (h.curPrice||0) : h.avgBuy);
+const curPrice = (h.curPrice == null ? (avgBuy||0) : h.curPrice);
+const priceChange = avgBuy ? ((curPrice / avgBuy) - 1) : 0;
+$('drawerPriceChange').textContent = `${priceChange>=0?'+':''}${pc(priceChange, 2)}`;
+$('drawerReturn').textContent = `${(h.ret12m||0)>=0?'+':''}${pc(h.ret12m||0, 2)}`;
+$('drawerNotes').textContent = h.notes || '—';
+$('drawerAvgBuy').textContent = mo((avgBuy||0)*fx, S.currency);
+$('drawerCurPrice').textContent = mo((curPrice||0)*fx, S.currency);
+const realized = (h.realized || 0) * fx;
+const unrealized = ((h.valueEUR||0) * priceChange) * fx;
+$('drawerRealized').textContent = `${realized>=0?'+':''}${mo(realized, S.currency)}`;
+$('drawerUnrealized').textContent = `${unrealized>=0?'+':''}${mo(unrealized, S.currency)}`;
+overlay.classList.remove('hidden');
+drawer.classList.remove('translate-x-full');
+overlay.setAttribute('aria-hidden','false');
+}
+function cd(){
+drawer.classList.add('translate-x-full');
+overlay.classList.add('hidden');
+overlay.setAttribute('aria-hidden','true');
+}
+$('cd').addEventListener('click', cd);
+overlay.addEventListener('click', cd);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cd(); });
+Chart.defaults.font.family = "ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial";
+function act(){
+const dark = S.theme === 'dark';
+Chart.defaults.color = dark ? "#e2e8f0" : "#334155";
+}
+function pal(i){
+const colors = [
+"#1d4ed8", "#0f172a", "#334155", "#3b82f6", "#64748b",
+"#2563eb", "#475569", "#60a5fa", "#94a3b8", "#1e293b"
+];
+return colors[i % colors.length];
+}
+const zeroLinePlugin = {
+id: 'zeroLine',
+afterDraw(chart, args, opts){
+if (!opts || !opts.enabled) return;
+const { ctx, chartArea, scales } = chart;
+if (!scales || !scales.y) return;
+const y0 = scales.y.getPixelForValue(0);
+if (y0 < chartArea.top || y0 > chartArea.bottom) return;
+ctx.save();
+ctx.beginPath();
+ctx.moveTo(chartArea.left, y0);
+ctx.lineTo(chartArea.right, y0);
+ctx.lineWidth = 1;
+ctx.setLineDash([4,4]);
+ctx.strokeStyle = (S.theme === 'dark') ? "rgba(148,163,184,0.35)" : "rgba(100,116,139,0.35)";
+ctx.stroke();
+ctx.restore();
+}
+};
+Chart.register(zeroLinePlugin);
+let lineChart = null;
+function sl(dates, maxTicks=16){
+const n = dates.length;
+const label = (d)=>d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+if (n <= maxTicks) return dates.map(label);
+const step = Math.ceil(n / maxTicks);
+return dates.map((d,i)=> (i % step === 0 || i === n-1) ? label(d) : '');
+}
+function tt(values){
+const sorted = [...values].sort((a,b)=>a-b);
+const q = (p)=>sorted[Math.floor(p*(sorted.length-1))] || 0;
+const q40 = q(0.40), q70 = q(0.70), q90 = q(0.90);
+return values.map(v => {
+if (v >= q90) return 5;
+if (v >= q70) return 4;
+if (v >= q40) return 3;
+return 2;
+});
+}
+function rlc(rows, win){
+const fx = fr(S.currency);
+const dates = B.slice(win.startIdx, win.endIdx+1);
+const labels = sl(dates, 16);
+const holdingsSeriesAbs = rows.map(h =>
+(D.fullValueEUR.get(h.ticker) || []).slice(win.startIdx, win.endIdx+1).map(v => v * fx)
+);
+const { cashEURSeries } = pse(rows, win.startIdx, win.endIdx);
+const cashAbs = cashEURSeries.map(v => v * fx);
+const holdingsSumAbs = dates.map((_,i)=> holdingsSeriesAbs.reduce((s,hs)=>s+(hs[i]||0),0));
+const portfolioAbs = holdingsSumAbs.map((v,i)=>v + (cashAbs[i]||0));
+const benchAbs = (D.fullBench || []).slice(win.startIdx, win.endIdx+1);
+const rebase = (arr)=> {
+const first = arr[0] || 1;
+return arr.map(v => (v/first) - 1);
+};
+const isPct = S.chartMode === 'pc';
+const showBench = S.benchmarkOn;
+const endVals = holdingsSeriesAbs.map(s => s[s.length-1] || 0);
+const tiers = tt(endVals);
+const isMobile = innerWidth<641;
+const rankIdx = endVals.map((v,i)=>({v,i})).sort((a,b)=>b.v-a.v).map(o=>o.i);
+const mobileShowSet = new Set(rankIdx.slice(0, 4)); // top 4 holdings + portfolio
+const datasets = [];
+datasets.push({
+label: 'Portfolio',
+data: isPct ? rebase(portfolioAbs) : portfolioAbs.map(v=>Math.round(v)),
+borderColor: "#1d4ed8",
+backgroundColor: isPct ? "rgba(0,0,0,0)" : "rgba(29,78,216,0.10)",
+fill: !isPct,
+tension: 0.35,
+pointRadius: 0,
+borderWidth: isPct ? 6 : 3,
+yAxisID: 'y'
+});
+rows.forEach((h, i) => {
+const abs = holdingsSeriesAbs[i];
+datasets.push({
+label: h.ticker,
+data: isPct ? rebase(abs) : abs.map(v=>Math.round(v)),
+borderColor: pal(i+1),
+backgroundColor: "rgba(0,0,0,0)",
+fill: false,
+tension: 0.35,
+pointRadius: 0,
+borderWidth: isPct ? tiers[i] : 2,
+hidden: isMobile ? !mobileShowSet.has(i) : false,
+yAxisID: 'y'
+});
+});
+if (showBench) {
+datasets.push({
+label: D.benchSymbol ? `${D.benchSymbol} (Benchmark)` : 'Benchmark',
+data: isPct ? rebase(benchAbs) : benchAbs.map(v=>Math.round(v)),
+borderColor: "#64748b",
+backgroundColor: "rgba(0,0,0,0)",
+fill: false,
+tension: 0.35,
+pointRadius: 0,
+borderDash: [6,6],
+borderWidth: 2,
+yAxisID: isPct ? 'y' : 'y1'
+});
+}
+const gridColor = (S.theme === 'dark') ? "rgba(148,163,184,0.18)" : "rgba(148,163,184,0.25)";
+const ctx = $('lineChart').getContext('2d');
+if (lineChart) lineChart.destroy();
+lineChart = new Chart(ctx, {
+type: 'line',
+data: { labels, datasets },
+options: {
+responsive: true,
+maintainAspectRatio: false,
+interaction: { mode: 'index', intersect: false },
+plugins: {
+legend: {
+position: 'top',
+align: 'end',
+labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: 'circle' }
+},
+tooltip: {
+callbacks: {
+title: (items)=>{
+const idx = items[0].dataIndex;
+return dates[idx].toLocaleDateString('en-US', { year:'numeric', month:'short', day:'2-digit' });
+},
+label: (ctx)=>{
+const label = ctx.dataset.label || '';
+const y = ctx.parsed.y;
+if (isPct) return `${label}: ${y>=0?'+':''}${pc(y,2)}`;
+if (label.includes('Benchmark')) return `${label}: ${nu(y,0)} (Index)`;
+return `${label}: ${mo(y, S.currency)}`;
+}
+}
+},
+zeroLine: { enabled: isPct }
+},
+scales: {
+x: {
+grid: { color: "rgba(0,0,0,0)", drawBorder: false },
+ticks: { color: (S.theme === 'dark') ? "#cbd5e1" : "#64748b" }
+},
+y: {
+position: 'left',
+grid: { color: gridColor, drawBorder: false },
+ticks: {
+callback: (v)=>{
+if (isPct) return (v>=0?'+':'') + pc(v,0);
+if (v >= 1000000) return (S.currency==='EUR'?'€ ':'$ ') + (v/1000000).toFixed(2) + 'm';
+if (v >= 1000) return (S.currency==='EUR'?'€ ':'$ ') + (v/1000).toFixed(0) + 'k';
+return v;
+}
+}
+},
+y1: {
+display: !isPct && showBench,
+position: 'right',
+grid: { drawOnChartArea: false, drawBorder: false },
+ticks: { callback: (v)=> nu(v,0) }
+}
+}
+}
+});
+}
+function usl(){
+let s = c(S.startMonth, 0, 59);
+let e = c(S.endMonth, 0, 59);
+if (s > e) { const tmp = s; s = e; e = tmp; }
+const startLab = M[s].label;
+const endLab = M[e].label;
+$('rangeLabelStart').textContent = startLab;
+$('rangeLabelEnd').textContent = endLab;
+$('startMonthVal').textContent = `#${s} • ${startLab}`;
+$('endMonthVal').textContent = `#${e} • ${endLab}`;
+}
+function at(){
+const dark = S.theme === 'dark';
+document.body.classList.toggle('bg-slate-50', !dark);
+document.body.classList.toggle('text-slate-900', !dark);
+document.body.classList.toggle('bg-slate-950', dark);
+document.body.classList.toggle('text-slate-100', dark);
+$('themeState').textContent = dark ? 'Dark' : 'Light';
+act();
+}
+function ssh(){
+const h = fh();
+if (h.currency && ['EUR','USD'].includes(h.currency)) S.currency = h.currency;
+if (h.region) S.region = h.region;
+if (h.sector) S.sector = h.sector;
+if (h.account) S.account = h.account;
+if (h.chartMode && ['abs','pc'].includes(h.chartMode)) S.chartMode = h.chartMode;
+if (h.benchmark !== undefined) S.benchmarkOn = (h.benchmark === '1' || h.benchmark === 'true' || h.benchmark === 'On');
+if (h.theme && ['light','dark'].includes(h.theme)) S.theme = h.theme;
+if (h.start !== undefined) S.startMonth = c(parseInt(h.start,10) || S.startMonth, 0, 59);
+if (h.end !== undefined) S.endMonth = c(parseInt(h.end,10) || S.endMonth, 0, 59);
+if (h.search !== undefined) S.search = h.search;
+if (h.sortKey) S.sortKey = h.sortKey;
+if (h.sortDir && ['asc','desc'].includes(h.sortDir)) S.sortDir = h.sortDir;
+}
+function shs(){
+const hash = th({
+start: S.startMonth,
+end: S.endMonth,
+currency: S.currency,
+region: S.region,
+sector: S.sector,
+account: S.account,
+chartMode: S.chartMode,
+benchmark: S.benchmarkOn ? '1' : '0',
+theme: S.theme,
+search: S.search,
+sortKey: S.sortKey,
+sortDir: S.sortDir
+});
+if (location.hash !== hash) history.replaceState(null, '', hash);
+}
+function rsf(){
+$('stateCurrency').textContent = S.currency;
+$('stateBenchmark').textContent = S.benchmarkOn ? 'On' : 'Off';
+$('stateRegion').textContent = S.region;
+$('benchmarkState').textContent = S.benchmarkOn ? 'On' : 'Off';
+$('selectedRegionLabel').textContent = S.region;
+}
+function ua(){
+const win = cw();
+const rowsAll = cwts(hf(false), win.endIdx);
+const rowsTable = cwts(hf(true), win.endIdx);
+rk(rowsAll, win);
+rpp(rowsAll, win);
+rlc(rowsAll, win);
+rd(rowsAll, win.endIdx);
+const sorted = so(rowsTable).slice(0, 10);
+ssi(S.sortKey);
+rht(sorted);
+rsf();
+}
+function scm(mode){
+S.chartMode = mode;
+const abs = $('modeAbs');
+const pctBtn = $('modePct');
+if (mode === 'abs') {
+abs.className = "text-xs px-3 py-2 rounded-lg bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-200";
+pctBtn.className = "text-xs px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200";
+abs.setAttribute('aria-pressed','true');
+pctBtn.setAttribute('aria-pressed','false');
+} else {
+pctBtn.className = "text-xs px-3 py-2 rounded-lg bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-200";
+abs.className = "text-xs px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200";
+pctBtn.setAttribute('aria-pressed','true');
+abs.setAttribute('aria-pressed','false');
+}
+}
+function bs(){
+const headers = document.querySelectorAll('thead th[data-sort]');
+headers.forEach(th => {
+th.addEventListener('click', () => {
+const key = th.getAttribute('data-sort');
+if (S.sortKey === key) S.sortDir = (S.sortDir === 'asc') ? 'desc' : 'asc';
+else {
+S.sortKey = key;
+S.sortDir = (key === 'ticker' || key === 'name' || key === 'sector') ? 'asc' : 'desc';
+}
+shs();
+ua();
+});
+});
+}
+function bct(){
+$('currencySelect').addEventListener('change', (e) => {
+S.currency = e.target.value;
+shs();
+rtx();
+ua();
+});
+$('benchmarkToggle').addEventListener('click', () => {
+S.benchmarkOn = !S.benchmarkOn;
+shs();
+ua();
+});
+$('modeAbs').addEventListener('click', () => {
+scm('abs');
+shs();
+ua();
+});
+$('modePct').addEventListener('click', () => {
+scm('pc');
+shs();
+ua();
+});
+$('themeToggle').addEventListener('click', () => {
+S.theme = (S.theme === 'light') ? 'dark' : 'light';
+at();
+shs();
+ua();
+});
+$('applyFilters').addEventListener('click', () => {
+S.account = $('accountSelect').value;
+S.sector = $('sectorSelect').value;
+shs();
+ua();
+});
+$('clearRegion').addEventListener('click', () => {
+S.region = 'All';
+shs();
+ua();
+});
+$('resetAllocation').addEventListener('click', () => {
+S.region = 'All';
+shs();
+ua();
+});
+$('searchHoldings').addEventListener('input', (e) => {
+S.search = e.target.value || '';
+shs();
+ua();
+});
+$('downloadCsv').addEventListener('click', () => {
+const win = cw();
+const rows = so(cwts(hf(true), win.endIdx)).slice(0,10);
+ehc(rows);
+});
+$('exportBtn').addEventListener('click', () => {
+const msg =
+`Export (mock)
+State:
+- startMonth=${S.startMonth}
+- endMonth=${S.endMonth}
+- currency=${S.currency}
+- benchmark=${S.benchmarkOn ? 'On' : 'Off'}
+- chartMode=${S.chartMode}
+- region=${S.region}
+- sector=${S.sector}
+- account=${S.account}
+- search="${S.search}"
+- sortKey=${S.sortKey}
+- sortDir=${S.sortDir}
+Data:
+- usingRealData=${D.usingRealData}
+- holdings=${D.holdings.length}
+- benchSymbol=${D.benchSymbol || '—'}
+`;
+dl('export.txt', msg);
+});
+const startSlider = $('startMonth');
+const endSlider = $('endMonth');
+startSlider.addEventListener('input', (e)=>{
+S.startMonth = parseInt(e.target.value, 10);
+usl();
+shs();
+ua();
+});
+endSlider.addEventListener('input', (e)=>{
+S.endMonth = parseInt(e.target.value, 10);
+usl();
+shs();
+ua();
+});
+$('preset12m').addEventListener('click', ()=>{
+S.endMonth = 59;
+S.startMonth = 59 - 11;
+startSlider.value = S.startMonth;
+endSlider.value = S.endMonth;
+usl();
+shs();
+ua();
+});
+$('presetYTD').addEventListener('click', ()=>{
+const now = new Date();
+const jan = new Date(now.getFullYear(), 0, 1);
+let idx = 0;
+for (const m of M){
+if (m.dt.getFullYear() === jan.getFullYear() && m.dt.getMonth() === jan.getMonth()) { idx = m.i; break; }
+}
+S.startMonth = idx;
+S.endMonth = 59;
+startSlider.value = S.startMonth;
+endSlider.value = S.endMonth;
+usl();
+shs();
+ua();
+});
+$('preset5y').addEventListener('click', ()=>{
+S.startMonth = 0;
+S.endMonth = 59;
+startSlider.value = S.startMonth;
+endSlider.value = S.endMonth;
+usl();
+shs();
+ua();
+});
+$('loadLocalData').addEventListener('click', llc);
+$('resetDummy').addEventListener('click', () => {
+ld();
+lu();
+ss('Using built-in dummy dataset.', false);
+rtx();
+ua();
+});
+}
+function init(){
+lu();
+ld();
+ssh();
+$('currencySelect').value = S.currency;
+$('accountSelect').value = S.account;
+$('sectorSelect').value = S.sector;
+$('searchHoldings').value = S.search;
+const startSlider = $('startMonth');
+const endSlider = $('endMonth');
+startSlider.value = S.startMonth;
+endSlider.value = S.endMonth;
+usl();
+scm(S.chartMode);
+at();
+rtx();
+bct();
+bs();
+ua();
+window.addEventListener('hashchange', () => {
+ssh();
+$('currencySelect').value = S.currency;
+$('accountSelect').value = S.account;
+$('sectorSelect').value = S.sector;
+$('searchHoldings').value = S.search;
+startSlider.value = S.startMonth;
+endSlider.value = S.endMonth;
+usl();
+scm(S.chartMode);
+at();
+rtx();
+ua();
+});
+window.addEventListener('resize', () => {
+ua();
+});
+}
+init();
+</script>
+</body>
+</html>
