@@ -1149,22 +1149,23 @@
       totalBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(deltaBench)} mono`;
       totalBadge.textContent = `${deltaBench>=0?'+':''}${pct(deltaBench,2)}`;
 
-      // row2 returns
+      // row2 returns (always based on full history up to end date, not the slider start)
       const endGlobal = win.endIdx;
-      const startGlobal = win.startIdx;
+      const portFullDisp = full;
+      const benchFull = (dataStore.fullBench || []).slice(0, endGlobal + 1);
 
-      const clampStart = (idx) => Math.max(startGlobal, idx);
-      const idxDaysBack = (days) => clampStart(Math.max(0, endGlobal - days));
+      const clampGlobal = (idx) => clamp(idx, 0, endGlobal);
+      const idxDaysBack = (days) => clampGlobal(endGlobal - days);
       const idxMonthsBack = (months) => {
         const endDate = BUSINESS_DAYS[endGlobal];
         const target = new Date(endDate.getFullYear(), endDate.getMonth() - months, endDate.getDate());
-        return clampStart(findIndexOnOrBefore(target));
+        return clampGlobal(findIndexOnOrBefore(target));
       };
 
       const mk = (label, fromIdxGlobal) => {
-        const fromLocal = fromIdxGlobal - startGlobal;
-        const portR = returnBetween(portDisp, fromLocal, portDisp.length-1);
-        const benchR = returnBetween(benchWin, fromLocal, benchWin.length-1);
+        const fromIdx = clampGlobal(fromIdxGlobal);
+        const portR = returnBetween(portFullDisp, fromIdx, endGlobal);
+        const benchR = returnBetween(benchFull, fromIdx, endGlobal);
         return { label, port: portR, delta: portR - benchR };
       };
 
