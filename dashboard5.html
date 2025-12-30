@@ -888,10 +888,14 @@
       return out;
     }
     async function fetchAlignedSeries(symbol, proxyBase){
-      const txt = await fetchTextMaybeProxy(stooqHistoryUrl(symbol), proxyBase);
-      const map = parseStooqDailyCsvToMap(txt);
-      if (!map) return null;
-      return alignSeriesToBusinessDays(map);
+      try {
+        const txt = await fetchTextMaybeProxy(stooqHistoryUrl(symbol), proxyBase);
+        const map = parseStooqDailyCsvToMap(txt);
+        if (!map) return null;
+        return alignSeriesToBusinessDays(map);
+      } catch (_) {
+        return null;
+      }
     }
     async function asyncPool(limit, items, fn){
       const ret = [];
@@ -900,10 +904,7 @@
         const p = Promise.resolve().then(()=>fn(item));
         ret.push(p);
         if (limit <= items.length){
-          const e = p.then(
-            () => executing.splice(executing.indexOf(e),1),
-            () => executing.splice(executing.indexOf(e),1)
-          );
+          const e = p.finally(() => executing.splice(executing.indexOf(e),1));
           executing.push(e);
           if (executing.length >= limit) await Promise.race(executing);
         }
