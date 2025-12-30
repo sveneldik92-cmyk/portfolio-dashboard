@@ -1149,9 +1149,16 @@
       totalBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(deltaBench)} mono`;
       totalBadge.textContent = `${deltaBench>=0?'+':''}${pct(deltaBench,2)}`;
 
-      // row2 returns (always based on full history up to end date, not the slider start)
-      const endGlobal = win.endIdx;
-      const portFullDisp = full;
+      // row2 returns (always based on full history up to latest date, not the slider)
+      const endGlobal = BUSINESS_DAYS.length - 1;
+      const portFullDisp = [];
+      for (let i=0;i<=endGlobal;i++){
+        let s = cashSeriesEURForAccount(state.account)[i] || 0;
+        for (const h of rowsForAll){
+          s += (valueSeriesEUR(h)[i] || 0);
+        }
+        portFullDisp.push(eurToDisplay(s, i));
+      }
       const benchFull = (dataStore.fullBench || []).slice(0, endGlobal + 1);
 
       const clampGlobal = (idx) => clamp(idx, 0, endGlobal);
