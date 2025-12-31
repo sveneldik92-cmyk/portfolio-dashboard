@@ -51,6 +51,14 @@
             <div class="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
               <span class="inline-flex items-center px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200">
                 Last updated: <span id="lastUpdated" class="ml-1 font-medium text-slate-700"></span>
+                <span class="mx-2 text-slate-300">•</span>
+                Version:
+                <a id="versionTag"
+                  class="ml-1 font-medium text-slate-700 underline decoration-dotted hover:text-slate-900"
+                  href="https://github.com/sveneldik92-cmyk/sveneldik92-cmyk.github.io"
+                  target="_blank"
+                  rel="noreferrer">
+                </a>
               </span>
               <span id="dataPill" class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800">
                 <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -623,10 +631,52 @@
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
     }
 
-    function setLastUpdated() {
-      const d = new Date();
-      document.getElementById('lastUpdated').textContent =
-        `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    function formatTimestamp(d) {
+      return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+
+    function updateVersionInUrl(version) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('v', version);
+      window.history.replaceState({}, '', url);
+    }
+
+    async function setLastUpdated() {
+      const lastUpdatedEl = document.getElementById('lastUpdated');
+      const versionTagEl = document.getElementById('versionTag');
+      const fallbackDate = new Date();
+      const fallbackVersion = 'Local';
+
+      lastUpdatedEl.textContent = formatTimestamp(fallbackDate);
+      versionTagEl.textContent = fallbackVersion;
+      versionTagEl.title = 'Local build (GitHub API unavailable)';
+      updateVersionInUrl('local');
+
+      const repoOwner = 'sveneldik92-cmyk';
+      const repoName = 'sveneldik92-cmyk.github.io';
+      const filePath = 'dashboard5.html';
+      const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/commits?path=${encodeURIComponent(filePath)}&per_page=1`;
+
+      try {
+        const response = await fetch(apiUrl, { headers: { 'Accept': 'application/vnd.github+json' } });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!Array.isArray(data) || data.length === 0) return;
+
+        const commit = data[0];
+        const commitDate = commit?.commit?.author?.date;
+        const commitSha = commit?.sha;
+        if (!commitDate || !commitSha) return;
+
+        const formattedDate = formatTimestamp(new Date(commitDate));
+        lastUpdatedEl.textContent = formattedDate;
+        versionTagEl.textContent = commitSha.slice(0, 7);
+        versionTagEl.href = `https://github.com/${repoOwner}/${repoName}/commit/${commitSha}`;
+        versionTagEl.title = `GitHub commit ${commitSha} (${formattedDate})`;
+        updateVersionInUrl(commitSha.slice(0, 7));
+      } catch (error) {
+        console.warn('Unable to fetch GitHub last updated date.', error);
+      }
     }
 
     /* ============================================================
