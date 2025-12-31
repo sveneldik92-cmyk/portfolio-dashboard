@@ -236,6 +236,60 @@
             </div>
           </section>
 
+          <!-- DEGIRO converter -->
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div class="p-4 border-b border-slate-200">
+              <h2 class="text-sm font-semibold text-slate-800">DEGIRO CSV Converter</h2>
+              <p class="text-xs text-slate-500 mt-1">Convert a DEGIRO <span class="mono">Transactions.csv</span> export into the <span class="mono">transactions.csv</span> format this dashboard expects.</p>
+            </div>
+
+            <div class="p-4 space-y-4 text-xs text-slate-600">
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] leading-relaxed">
+                <div class="font-semibold text-slate-700">Output columns</div>
+                <div class="mono mt-1">Date, Ticker, Type, Quantity, Price, Fee, Currency, Name, Account</div>
+                <div class="mt-1 text-slate-500">
+                  Dates convert to <span class="mono">YYYY-MM-DD</span>. BUY/SELL is inferred from the sign of <span class="mono">Aantal</span>.
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="degiroFile">1) DEGIRO transactions CSV</label>
+                <input id="degiroFile" type="file" accept=".csv,text/csv"
+                  class="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:px-3 file:py-2 file:rounded-xl file:border file:border-slate-200 file:bg-white file:shadow-sm hover:file:bg-slate-50 focus:outline-none" />
+                <p class="mt-1 text-[11px] text-slate-500">Uses Dutch headers (Datum, Product, Aantal, Koers, ISIN).</p>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="degiroMapFile">2) Optional ISIN → Ticker mapping CSV</label>
+                <input id="degiroMapFile" type="file" accept=".csv,text/csv"
+                  class="mt-1 block w-full text-sm text-slate-700 file:mr-3 file:px-3 file:py-2 file:rounded-xl file:border file:border-slate-200 file:bg-white file:shadow-sm hover:file:bg-slate-50 focus:outline-none" />
+                <p class="mt-1 text-[11px] text-slate-500">Mapping can be <span class="mono">ISIN,Ticker</span> or have headers.</p>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600" for="degiroMapText">Or paste mapping (ISIN,Ticker per line)</label>
+                <textarea id="degiroMapText"
+                  class="mt-1 w-full min-h-[88px] text-[11px] mono bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  placeholder="IE00B3XXRP09,VUSA.UK&#10;IE0032077012,EQQQ.FR"></textarea>
+                <p class="mt-1 text-[11px] text-slate-500">If both mapping file and pasted mapping exist, pasted mapping wins.</p>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <button id="degiroConvertBtn"
+                  class="text-sm px-3 py-2 rounded-xl bg-slate-900 text-white shadow-sm hover:bg-slate-800 active:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  disabled>
+                  Convert &amp; download
+                </button>
+                <span id="degiroStatus" class="text-[11px] text-slate-500">Pick an input file…</span>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-600">Preview (first ~20 lines)</label>
+                <pre id="degiroPreview" class="mt-2 p-3 rounded-xl bg-slate-900 text-slate-100 text-[11px] overflow-auto">(nothing yet)</pre>
+              </div>
+            </div>
+          </section>
+
           <!-- Filters -->
           <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
             <div class="p-4 border-b border-slate-200">
@@ -332,7 +386,7 @@
                   <tr class="text-left text-[11px] font-semibold text-slate-600">
                     <th class="px-4 py-3">Date</th>
                     <th class="px-4 py-3">Type</th>
-                    <th class="px-4 py-3">Ticker</th>
+                    <th class="px-4 py-3">Name</th>
                     <th class="px-4 py-3 text-right">Amount</th>
                     <th class="px-4 py-3 text-right">P&L</th>
                   </tr>
@@ -478,8 +532,8 @@
               <table class="min-w-full">
                 <thead class="bg-slate-50 border-b border-slate-200">
                   <tr class="text-left text-xs font-semibold text-slate-600">
-                    <th class="px-4 py-3 cursor-pointer select-none" data-sort="ticker">Ticker <span class="text-slate-400" id="sort_ticker"></span></th>
                     <th class="px-4 py-3 cursor-pointer select-none" data-sort="name">Name <span class="text-slate-400" id="sort_name"></span></th>
+                    <th class="px-4 py-3 cursor-pointer select-none" data-sort="ticker">Ticker <span class="text-slate-400" id="sort_ticker"></span></th>
                     <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="value">Market Value <span class="text-slate-400" id="sort_value"></span></th>
                     <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="weight">Weight <span class="text-slate-400" id="sort_weight"></span></th>
                     <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="ret12m">12M Return <span class="text-slate-400" id="sort_ret12m"></span></th>
@@ -527,8 +581,8 @@
       <div class="p-4 space-y-4">
         <div class="grid grid-cols-2 gap-3">
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <div class="text-[11px] text-slate-500">Ticker</div>
-            <div class="mt-1 text-sm font-semibold mono" id="drawerTicker">—</div>
+            <div class="text-[11px] text-slate-500">Name</div>
+            <div class="mt-1 text-sm font-semibold" id="drawerTicker">—</div>
           </div>
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
             <div class="text-[11px] text-slate-500">Sector</div>
@@ -827,6 +881,226 @@
       });
     }
 
+    function parseNumEU(x){
+      if (x == null) return null;
+      let s = String(x).trim();
+      if (!s) return null;
+      s = s.replace(/[€$£]/g,'').replace(/\s/g,'');
+      let neg = false;
+      if (s.startsWith('(') && s.endsWith(')')){ neg = true; s = s.slice(1,-1); }
+      if (s.includes(',') && s.includes('.')){
+        if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g,'').replace(',', '.');
+        else s = s.replace(/,/g,'');
+      } else if (s.includes(',')){
+        s = s.replace(/\./g,'').replace(',', '.');
+      } else {
+        s = s.replace(/,/g,'');
+      }
+      const v = Number(s);
+      if (!Number.isFinite(v)) return null;
+      return neg ? -v : v;
+    }
+
+    function toISODate_DDMMYYYY(s){
+      const t = String(s || '').trim();
+      const m = t.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+      if (!m) return null;
+      return `${m[3]}-${m[2]}-${m[1]}`;
+    }
+
+    function csvEscape(v){
+      const s = String(v ?? '');
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+      return s;
+    }
+
+    function downloadCsv(filename, text){
+      const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    function parseMappingFromText(text){
+      const map = new Map();
+      const lines = String(text || '').split(/\r?\n/);
+      for (const line of lines){
+        const t = line.trim();
+        if (!t || t.startsWith('#')) continue;
+        const parts = t.split(',').map(x => x.trim());
+        if (parts.length < 2) continue;
+        const isin = parts[0].toUpperCase();
+        const ticker = parts[1].toUpperCase();
+        if (isin && ticker) map.set(isin, ticker);
+      }
+      return map;
+    }
+
+    function parseMappingCsv(csvText){
+      const rows = parseCSV(csvText);
+      if (!rows.length) return new Map();
+      const header = rows[0].map(normKey);
+      let iIsin = header.indexOf('isin');
+      let iTicker = header.indexOf('ticker');
+      if (iTicker < 0) iTicker = header.indexOf('symbol');
+      const map = new Map();
+
+      const start = (iIsin >= 0 && iTicker >= 0) ? 1 : 0;
+      for (let r=start; r<rows.length; r++){
+        const row = rows[r];
+        const isin = String(row[iIsin >= 0 ? iIsin : 0] || '').trim().toUpperCase();
+        const ticker = String(row[iTicker >= 0 ? iTicker : 1] || '').trim().toUpperCase();
+        if (isin && ticker) map.set(isin, ticker);
+      }
+      return map;
+    }
+
+    function convertDegiroToDashboard(degiroCsvText, isinToTicker){
+      const rows = parseCSV(degiroCsvText);
+      if (!rows.length) throw new Error('Input CSV is empty.');
+
+      const headerRaw = rows[0];
+      const header = headerRaw.map(normKey);
+      const find = (key) => header.indexOf(normKey(key));
+
+      const iDate  = find('Datum');
+      const iName  = find('Product');
+      const iIsin  = find('ISIN');
+      const iQty   = find('Aantal');
+      const iPrice = find('Koers');
+      const iLocalVal = find('Lokale waarde');
+      const iValEur = find('Waarde EUR');
+      const iFx    = find('Wisselkoers');
+      const iAutoFx = find('AutoFX Kosten');
+      const iFeesEur = find('Transactiekosten en/of kosten van derden EUR');
+
+      if (iDate < 0 || iQty < 0 || iPrice < 0 || iIsin < 0){
+        throw new Error('Missing required DEGIRO columns. Expected at least: Datum, ISIN, Aantal, Koers.');
+      }
+
+      const iCcyAfterPrice = (headerRaw[iPrice+1] === '') ? (iPrice+1) : -1;
+      const iCcyAfterLocal = (iLocalVal >= 0 && headerRaw[iLocalVal+1] === '') ? (iLocalVal+1) : -1;
+
+      const outRows = [];
+      outRows.push(['Date','Ticker','Type','Quantity','Price','Fee','Currency','Name','Account']);
+
+      for (let r=1; r<rows.length; r++){
+        const row = rows[r];
+        const iso = toISODate_DDMMYYYY(row[iDate]);
+        if (!iso) continue;
+
+        const qRaw = parseNumEU(row[iQty]);
+        if (!qRaw || qRaw === 0) continue;
+
+        const type = (qRaw > 0) ? 'BUY' : 'SELL';
+        const qty = Math.abs(qRaw);
+
+        const price = parseNumEU(row[iPrice]);
+        if (price == null) continue;
+
+        const isin = String(row[iIsin] || '').trim().toUpperCase();
+        const name = iName >= 0 ? String(row[iName] || '').trim() : '';
+        const ccy = String(
+          (iCcyAfterLocal >= 0 ? row[iCcyAfterLocal] : '') ||
+          (iCcyAfterPrice >= 0 ? row[iCcyAfterPrice] : '') ||
+          'EUR'
+        ).trim().toUpperCase() || 'EUR';
+
+        const localVal = iLocalVal >= 0 ? parseNumEU(row[iLocalVal]) : null;
+        const valEur = iValEur >= 0 ? parseNumEU(row[iValEur]) : null;
+        let fx = iFx >= 0 ? parseNumEU(row[iFx]) : null;
+        if (fx == null && localVal != null && valEur != null && valEur !== 0){
+          fx = Math.abs(localVal) / Math.abs(valEur);
+        }
+
+        const feeEur = Math.abs((iFeesEur >= 0 ? (parseNumEU(row[iFeesEur]) || 0) : 0) + (iAutoFx >= 0 ? (parseNumEU(row[iAutoFx]) || 0) : 0));
+        const feeLocal = (ccy === 'EUR' || !fx) ? feeEur : (feeEur * fx);
+
+        const ticker = (isinToTicker && isinToTicker.has(isin)) ? isinToTicker.get(isin) : (isin || name || 'UNKNOWN');
+
+        outRows.push([
+          iso,
+          ticker,
+          type,
+          String(qty),
+          String(price),
+          String(feeLocal || 0),
+          ccy,
+          name,
+          'DEGIRO'
+        ]);
+      }
+
+      if (outRows.length <= 1) throw new Error('No usable rows found. (Date parsing expects DD-MM-YYYY.)');
+
+      const csv = outRows.map(r => r.map(csvEscape).join(',')).join('\n');
+      return { csv, preview: csv.split('\n').slice(0, 20).join('\n'), rows: outRows.length-1 };
+    }
+
+    function bindDegiroConverter(){
+      const inFile = document.getElementById('degiroFile');
+      const mapFile = document.getElementById('degiroMapFile');
+      const mapText = document.getElementById('degiroMapText');
+      const btn = document.getElementById('degiroConvertBtn');
+      const status = document.getElementById('degiroStatus');
+      const preview = document.getElementById('degiroPreview');
+
+      if (!inFile || !btn || !status || !preview) return;
+
+      function setStatus(msg, bad=false){
+        status.textContent = msg;
+        status.className = bad ? 'text-[11px] text-rose-600' : 'text-[11px] text-emerald-700';
+      }
+
+      function refreshButton(){
+        const hasFile = inFile.files && inFile.files[0];
+        btn.disabled = !hasFile;
+        if (hasFile) setStatus('Ready to convert.', false);
+        else {
+          status.textContent = 'Pick an input file…';
+          status.className = 'text-[11px] text-slate-500';
+        }
+      }
+
+      inFile.addEventListener('change', refreshButton);
+      refreshButton();
+
+      btn.addEventListener('click', async () => {
+        try {
+          btn.disabled = true;
+          setStatus('Reading files…', false);
+
+          const degiroText = await readFileText(inFile.files[0]);
+
+          let mapping = new Map();
+          const pasted = mapText.value.trim();
+          if (pasted){
+            mapping = parseMappingFromText(pasted);
+          } else if (mapFile.files && mapFile.files[0]){
+            const mapCsv = await readFileText(mapFile.files[0]);
+            mapping = parseMappingCsv(mapCsv);
+          }
+
+          setStatus('Converting…', false);
+          const { csv, preview: pv, rows } = convertDegiroToDashboard(degiroText, mapping);
+
+          preview.textContent = pv;
+          setStatus(`Done. Converted ${rows} rows. Downloading…`, false);
+          downloadCsv('transactions.csv', csv);
+        } catch (e){
+          preview.textContent = '(nothing)';
+          setStatus(String(e && e.message ? e.message : e), true);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    }
+
     function dateToISO(d){
       return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
     }
@@ -1104,6 +1378,11 @@
             <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.secondaryDeltaValue)} mono">${x.secondaryDeltaText}</div>
           </div>
           <div class="text-[11px] text-slate-500">Δ vs Benchmark</div>
+          <div class="mt-1 flex items-baseline justify-between gap-2">
+            <div class="text-sm font-semibold mono text-slate-900">${x.mainText}</div>
+            <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.badgeValue)} mono">${x.badgeText}</div>
+          </div>
+          <div class="mt-1 text-[11px] text-slate-500">${x.subLabel || 'Δ vs Benchmark'}</div>
         </div>
       `).join('');
     }
@@ -1223,6 +1502,8 @@
           secondaryText: showAbs ? `${portR>=0?'+':''}${pct(portR,2)}` : signedMoney(portAbs, state.currency),
           secondaryDeltaText: showAbs ? `${deltaPct>=0?'+':''}${pct(deltaPct,2)}` : signedMoney(deltaAbs, state.currency),
           secondaryDeltaValue: showAbs ? deltaPct : deltaAbs
+          badgeText: showAbs ? `${deltaPct>=0?'+':''}${pct(deltaPct,2)}` : signedMoney(deltaAbs, state.currency),
+          badgeValue: showAbs ? deltaPct : deltaAbs
         };
       };
 
@@ -1287,12 +1568,13 @@
         const pnlBadge = t.pnlDisp == null
           ? `<span class="text-[11px] text-slate-400">—</span>`
           : `<span class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(t.pnlDisp)} mono">${t.pnlDisp>=0?'+':''}${money(t.pnlDisp, state.currency)}</span>`;
+        const nameLabel = t.name || t.ticker || '—';
 
         return `
           <tr class="hover:bg-slate-50">
             <td class="px-4 py-3 text-xs text-slate-700 mono">${t.date || '—'}</td>
             <td class="px-4 py-3"><span class="text-[11px] px-2 py-1 rounded-lg border ${typeBadge}">${t.type}</span></td>
-            <td class="px-4 py-3 text-xs font-semibold text-slate-900">${t.ticker || '—'}</td>
+            <td class="px-4 py-3 text-xs font-semibold text-slate-900">${nameLabel}</td>
             <td class="px-4 py-3 text-xs text-slate-700 text-right mono">${money(t.amountDisp || 0, state.currency)}</td>
             <td class="px-4 py-3 text-right">${pnlBadge}</td>
           </tr>
@@ -1423,10 +1705,15 @@
       tbody.innerHTML = rows.map((h, idx) => {
         const retBadge = `<span class="text-xs px-2 py-1 rounded-lg border ${badgeClass(h.ret12m || 0)} mono">${(h.ret12m||0)>=0?'+':''}${pct(h.ret12m||0,2)}</span>`;
         const contribBadge = `<span class="text-xs px-2 py-1 rounded-lg border bg-blue-50 text-blue-800 border-blue-200 mono">${(h.contrib||0)>=0?'+':''}${pct(h.contrib||0,2)}</span>`;
+        const nameLabel = h.name || h.ticker || '—';
+        const tickerLabel = h.ticker || '—';
+        const accountLabel = h.account && h.account!=='All' && state.account==='All'
+          ? `<span class="ml-2 text-[11px] text-slate-500">(${h.account})</span>`
+          : '';
         return `
           <tr class="hover:bg-slate-50 cursor-pointer" data-row="${idx}">
-            <td class="px-4 py-3 text-sm font-semibold text-slate-900">${h.ticker}</td>
-            <td class="px-4 py-3 text-sm text-slate-700">${h.name}${h.account && h.account!=='All' && state.account==='All' ? `<span class="ml-2 text-[11px] text-slate-500">(${h.account})</span>` : ''}</td>
+            <td class="px-4 py-3 text-sm font-semibold text-slate-900">${nameLabel}${accountLabel}</td>
+            <td class="px-4 py-3 text-sm text-slate-700 mono">${tickerLabel}</td>
             <td class="px-4 py-3 text-sm text-slate-700 text-right mono">${money(eurToDisplay((h.valueEUR||0), win.endIdx), state.currency)}</td>
             <td class="px-4 py-3 text-sm text-slate-700 text-right mono">${pct(h.weight||0,1)}</td>
             <td class="px-4 py-3 text-right">${retBadge}</td>
@@ -1443,12 +1730,12 @@
 
     function exportHoldingsCsv(rows){
       const win = currentWindow();
-      const header = ['Ticker','Name','MarketValue','Weight','Return12M','Contribution','Sector','Region','Account','Currency'];
+      const header = ['Name','Ticker','MarketValue','Weight','Return12M','Contribution','Sector','Region','Account','Currency'];
       const lines = [header.join(',')];
       rows.forEach(h => {
         const line = [
-          h.ticker,
           `"${String(h.name||'').replace(/"/g,'""')}"`,
+          h.ticker,
           (eurToDisplay((h.valueEUR||0), win.endIdx)).toFixed(2),
           (h.weight||0).toFixed(6),
           (h.ret12m||0).toFixed(6),
@@ -1473,8 +1760,9 @@
       const win = currentWindow();
       const endIdx = win.endIdx;
 
-      document.getElementById('drawerTitle').textContent = `${h.name || '—'}`;
-      document.getElementById('drawerTicker').textContent = h.ticker || '—';
+      const nameLabel = h.name || h.ticker || '—';
+      document.getElementById('drawerTitle').textContent = nameLabel;
+      document.getElementById('drawerTicker').textContent = nameLabel;
       document.getElementById('drawerSector').textContent = h.sector || '—';
       document.getElementById('drawerValue').textContent = money(eurToDisplay((h.valueEUR||0), endIdx), state.currency);
       document.getElementById('drawerWeight').textContent = pct(h.weight||0, 2);
@@ -1836,7 +2124,7 @@
       const iFee = idx('fee', ['commission','costs']);
       const iCcy = idx('currency', ['ccy']);
       const iAmount = idx('amount', ['value','cashamount']);
-      const iName = idx('name');
+      const iName = idx('name', ['company', 'companyname', 'security', 'instrument', 'product', 'description', 'assetname']);
       const iRegion = idx('region');
       const iSector = idx('sector');
       const iAccount = idx('account', ['broker','portfolio']);
@@ -2516,6 +2804,8 @@ Data:
         renderTransactions();
         updateAll();
       });
+
+      bindDegiroConverter();
     }
 
     /* ============================================================
