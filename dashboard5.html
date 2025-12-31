@@ -2138,7 +2138,16 @@
       const pos = new Map(); // key -> stats
       const txOut = [];
 
-      const sorted = transactions.slice().sort((a,b)=> a.d.getTime() - b.d.getTime());
+      const typePriority = (t) => {
+        if (t.type === 'BUY') return 0;
+        if (t.type === 'SELL') return 1;
+        return 2;
+      };
+      const sorted = transactions.slice().sort((a,b)=> {
+        const dateDiff = a.d.getTime() - b.d.getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return typePriority(a) - typePriority(b);
+      });
 
       for (const t of sorted){
         const idx = findIndexOnOrAfter(t.d);
