@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>DEGIRO → transactions.csv converter</title>
+  <title>Transactions converter</title>
   <style>
     :root { color-scheme: light; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; line-height: 1.35; }
@@ -27,16 +27,20 @@
 </head>
 <body>
   <div class="card">
-    <h1>DEGIRO export → <span class="mono">transactions.csv</span> for your dashboard</h1>
-    <p>This converts a DEGIRO <span class="mono">Transactions.csv</span> (same structure as your <span class="mono">Transactions (5).csv</span>) into the column format required by <span class="mono">dashboard5.html</span>:</p>
-    <p class="mono muted">Date, Ticker, Type, Quantity, Price, Fee, Currency, Name, Account</p>
-    <p class="muted">Notes: Date is converted to <span class="mono">YYYY-MM-DD</span>. BUY/SELL is inferred from the sign of <span class="mono">Aantal</span>. Fees are converted into the instrument currency using <span class="mono">Wisselkoers</span> (fallback: Lokale waarde / Waarde EUR).</p>
+    <h1>Transactions converter → <span class="mono">transactions.csv</span></h1>
+    <p>This converts DEGIRO exports into the column format required by <span class="mono">dashboard5.html</span>. It supports:</p>
+    <ul class="muted" style="margin: 6px 0 0 18px;">
+      <li><span class="mono">Transactions.csv</span> with Dutch headers (Datum, Product, Aantal, Koers, …).</li>
+      <li>The “Order reference / Order type / Execution price” dividend report format shown in your screenshot.</li>
+    </ul>
+    <p class="mono muted" style="margin-top: 6px;">Date, Ticker, Type, Quantity, Price, Fee, Currency, Amount, Name, Account</p>
+    <p class="muted">Notes: Date is converted to <span class="mono">YYYY-MM-DD</span>. BUY/SELL is inferred from the sign of <span class="mono">Aantal</span> or <span class="mono">Order type</span>. Dividends are exported as <span class="mono">DIV</span> with <span class="mono">Amount</span> = Net proceeds.</p>
 
     <div class="grid">
       <div>
-        <label for="inFile">1) Choose DEGIRO transactions CSV</label>
+        <label for="inFile">1) Choose DEGIRO CSV</label>
         <input id="inFile" type="file" accept=".csv,text/csv" />
-        <p class="muted">Your DEGIRO export contains Dutch headers (Datum, Product, Aantal, Koers, …). This converter expects that.</p>
+        <p class="muted">Both the Dutch “Transactions.csv” and the dividend report export are supported.</p>
       </div>
 
       <div>
@@ -127,11 +131,26 @@
     return neg ? -v : v;
   }
 
-  function toISODate_DDMMYYYY(s){
+  function toISODate(s){
     const t = String(s||'').trim();
-    const m = t.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (!m) return null;
-    return `${m[3]}-${m[2]}-${m[1]}`;
+    if (!t) return null;
+    let m = t.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    m = t.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})$/);
+    if (m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+    m = t.match(/^(\d{1,2})\s+([A-Za-z\.]+)\s+(\d{4})/);
+    if (m){
+      const day = String(m[1]).padStart(2,'0');
+      const monthKey = m[2].toLowerCase().replace('.', '').slice(0,3);
+      const monthMap = {
+        jan: '01', feb: '02', mrt: '03', mar: '03', apr: '04', mei: '05', may: '05',
+        jun: '06', jul: '07', aug: '08', sep: '09', okt: '10', oct: '10', nov: '11', dec: '12'
+      };
+      const mm = monthMap[monthKey];
+      if (!mm) return null;
+      return `${m[3]}-${mm}-${day}`;
+    }
+    return null;
   }
 
   function csvEscape(v){
@@ -193,11 +212,52 @@
   }
 
   // ---------- main conversion ----------
-  function convertDegiroToDashboard(degiroCsvText, isinToTicker){
-    const rows = parseCSV(degiroCsvText);
-    if (!rows.length) throw new Error('Input CSV is empty.');
+  function findHeaderRow(rows, requiredHeaders){
+    for (let i = 0; i < rows.length; i++){
+      const header = rows[i].map(normHeader);
+      const ok = requiredHeaders.every((h) => header.includes(normHeader(h)));
+      if (ok) return i;
+    }
+    return -1;
+  }
 
-    const headerRaw = rows[0];
+  function detectCurrency(value, fallback='EUR'){
+    const s = String(value || '');
+    if (s.includes('€')) return 'EUR';
+    if (s.includes('$')) return 'USD';
+    if (s.includes('£')) return 'GBP';
+    if (s.includes('CHF')) return 'CHF';
+    return fallback;
+  }
+
+  function normalizeOrderType(value){
+    const t = String(value || '').trim().toLowerCase();
+    if (!t) return null;
+    if (t.includes('dividend')) return 'DIV';
+    if (t.includes('buy') || t.includes('koop')) return 'BUY';
+    if (t.includes('sell') || t.includes('verkoop')) return 'SELL';
+    if (t.includes('deposit') || t.includes('storting')) return 'DEPOSIT';
+    if (t.includes('withdraw') || t.includes('opname')) return 'WITHDRAW';
+    return null;
+  }
+
+  function buildTickerCandidate(isinToTicker, isin, name, instrument){
+    if (isinToTicker){
+      if (isin && isinToTicker.has(isin)) return isinToTicker.get(isin);
+      const instKey = String(instrument || '').trim().toUpperCase();
+      if (instKey && isinToTicker.has(instKey)) return isinToTicker.get(instKey);
+    }
+    if (isin) return isin;
+    if (instrument){
+      const token = String(instrument).trim().split(/\s+/)[0];
+      if (token) return token.toUpperCase();
+    }
+    if (name) return name;
+    return 'UNKNOWN';
+  }
+
+  function convertDegiroTransactionsCsv(rows, isinToTicker, headerRow){
+    const headerRaw = rows[headerRow];
     const header = headerRaw.map(normHeader);
 
     const find = (key) => header.indexOf(normHeader(key));
@@ -222,12 +282,9 @@
     const iCcyAfterLocal = (iLocalVal >= 0 && headerRaw[iLocalVal+1] === '') ? (iLocalVal+1) : -1;
 
     const outRows = [];
-    // dashboard expected header
-    outRows.push(['Date','Ticker','Type','Quantity','Price','Fee','Currency','Name','Account']);
-
-    for (let r=1; r<rows.length; r++){
+    for (let r=headerRow+1; r<rows.length; r++){
       const row = rows[r];
-      const iso = toISODate_DDMMYYYY(row[iDate]);
+      const iso = toISODate(row[iDate]);
       if (!iso) continue;
 
       const qRaw = parseNumEU(row[iQty]);
@@ -258,7 +315,7 @@
       const feeEur = Math.abs((iFeesEur >= 0 ? (parseNumEU(row[iFeesEur]) || 0) : 0) + (iAutoFx >= 0 ? (parseNumEU(row[iAutoFx]) || 0) : 0));
       const feeLocal = (ccy === 'EUR' || !fx) ? feeEur : (feeEur * fx);
 
-      const ticker = (isinToTicker && isinToTicker.has(isin)) ? isinToTicker.get(isin) : (isin || name || 'UNKNOWN');
+      const ticker = buildTickerCandidate(isinToTicker, isin, name, '');
 
       outRows.push([
         iso,
@@ -268,16 +325,96 @@
         String(price),
         String(feeLocal || 0),
         ccy,
+        '',
         name,
         'DEGIRO'
       ]);
     }
+    return outRows;
+  }
 
-    if (outRows.length <= 1) throw new Error('No usable rows found. (Date parsing expects DD-MM-YYYY.)');
+  function convertDegiroDividendReport(rows, isinToTicker, headerRow){
+    const headerRaw = rows[headerRow];
+    const header = headerRaw.map(normHeader);
+    const find = (key) => header.indexOf(normHeader(key));
 
-    // stringify
-    const csv = outRows.map(r => r.map(csvEscape).join(',')).join('\n');
-    return { csv, preview: csv.split('\n').slice(0, 20).join('\n'), rows: outRows.length-1 };
+    const iDate = find('Date');
+    const iOrderType = find('Order type');
+    const iQty = find('Quantity');
+    const iPrice = find('Execution price');
+    const iInstrument = find('Instrument');
+    const iFees = find('Fees');
+    const iTaxes = find('Taxes withheld');
+    const iNetProceeds = find('Net proceeds');
+    const iNetUnits = find('Net units');
+
+    if (iDate < 0 || iOrderType < 0 || iInstrument < 0){
+      throw new Error('Missing required columns in dividend report format.');
+    }
+
+    const outRows = [];
+    for (let r=headerRow+1; r<rows.length; r++){
+      const row = rows[r];
+      const iso = toISODate(row[iDate]);
+      if (!iso) continue;
+
+      const normType = normalizeOrderType(row[iOrderType]);
+      if (!normType) continue;
+
+      const instrument = String(row[iInstrument] || '').trim();
+      const ticker = buildTickerCandidate(isinToTicker, '', instrument, instrument);
+
+      const qty = iQty >= 0 ? parseNumEU(row[iQty]) : null;
+      const netUnits = iNetUnits >= 0 ? parseNumEU(row[iNetUnits]) : null;
+      const quantity = qty ?? netUnits ?? null;
+
+      const price = iPrice >= 0 ? parseNumEU(row[iPrice]) : null;
+      const fee = Math.abs((iFees >= 0 ? (parseNumEU(row[iFees]) || 0) : 0) + (iTaxes >= 0 ? (parseNumEU(row[iTaxes]) || 0) : 0));
+      const netProceeds = iNetProceeds >= 0 ? parseNumEU(row[iNetProceeds]) : null;
+      const currency = detectCurrency(row[iNetProceeds] || row[iPrice], 'EUR');
+
+      if ((normType === 'BUY' || normType === 'SELL') && (quantity == null || price == null)) continue;
+      if ((normType === 'DIV' || normType === 'DEPOSIT' || normType === 'WITHDRAW') && netProceeds == null) continue;
+
+      outRows.push([
+        iso,
+        ticker,
+        normType,
+        quantity != null ? String(Math.abs(quantity)) : '',
+        price != null ? String(price) : '',
+        String(fee || 0),
+        currency,
+        netProceeds != null ? String(netProceeds) : '',
+        instrument,
+        'DEGIRO'
+      ]);
+    }
+    return outRows;
+  }
+
+  function convertDegiroToDashboard(degiroCsvText, isinToTicker){
+    const rows = parseCSV(degiroCsvText);
+    if (!rows.length) throw new Error('Input CSV is empty.');
+
+    const dividendHeaderRow = findHeaderRow(rows, ['Order reference', 'Order type', 'Execution price']);
+    const txHeaderRow = findHeaderRow(rows, ['Datum', 'ISIN', 'Aantal', 'Koers']);
+
+    let outRows = [];
+    if (dividendHeaderRow >= 0){
+      outRows = convertDegiroDividendReport(rows, isinToTicker, dividendHeaderRow);
+    } else if (txHeaderRow >= 0){
+      outRows = convertDegiroTransactionsCsv(rows, isinToTicker, txHeaderRow);
+    } else {
+      throw new Error('Unrecognized DEGIRO CSV format. Please export Transactions.csv or the dividend report format.');
+    }
+
+    if (!outRows.length) throw new Error('No usable rows found in the DEGIRO export.');
+
+    const header = ['Date','Ticker','Type','Quantity','Price','Fee','Currency','Amount','Name','Account'];
+    const csvRows = [header, ...outRows];
+
+    const csv = csvRows.map(r => r.map(csvEscape).join(',')).join('\n');
+    return { csv, preview: csv.split('\n').slice(0, 20).join('\n'), rows: outRows.length };
   }
 
   // ---------- wire UI ----------
