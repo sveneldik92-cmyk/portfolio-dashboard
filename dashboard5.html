@@ -2310,8 +2310,8 @@
         }
       }
 
-      // Filter out zero-share positions for holdings table/series
-      const holdings = Array.from(pos.values()).filter(p => (p.shares || 0) > 0.0000001);
+      // Filter out zero-share positions for holdings table/series (keep shorts)
+      const holdings = Array.from(pos.values()).filter(p => Math.abs(p.shares || 0) > 0.0000001);
       return { holdings, txOut, posAll: pos };
     }
 
