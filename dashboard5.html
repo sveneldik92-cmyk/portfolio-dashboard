@@ -2400,10 +2400,19 @@
         const shares = new Array(BUSINESS_DAYS.length).fill(0);
         let cur = 0;
 
+        const typePriority = (t) => {
+          if (t.type === 'BUY') return 0;
+          if (t.type === 'SELL') return 1;
+          return 2;
+        };
         const txForThis = (dataStore.transactions || [])
           .filter(t => t.ticker === ticker && t.account === h.account && (t.type === 'BUY' || t.type === 'SELL'))
           .slice()
-          .sort((a,b)=> a.d.getTime() - b.d.getTime());
+          .sort((a,b)=> {
+            const dateDiff = a.d.getTime() - b.d.getTime();
+            if (dateDiff !== 0) return dateDiff;
+            return typePriority(a) - typePriority(b);
+          });
 
         // Apply step updates by idx
         const byIdx = new Map();
@@ -2417,7 +2426,7 @@
             for (const t of byIdx.get(i)){
               const q = (t.quantity ?? 0);
               if (t.type === 'BUY') cur += q;
-              else if (t.type === 'SELL') cur = Math.max(0, cur - q);
+              else if (t.type === 'SELL') cur -= q;
             }
           }
           shares[i] = cur;
