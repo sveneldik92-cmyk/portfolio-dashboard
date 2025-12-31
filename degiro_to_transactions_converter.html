@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DEGIRO → transactions.csv converter</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; line-height: 1.35; }
+    .card { max-width: 980px; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+    h1 { margin: 0 0 8px; font-size: 20px; }
+    p { margin: 6px 0; color: #374151; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+    label { font-size: 12px; color: #374151; font-weight: 600; display: block; margin-bottom: 6px; }
+    input[type="file"], textarea { width: 100%; border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px; }
+    textarea { min-height: 92px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+    button { border: 1px solid #e5e7eb; background: #111827; color: white; padding: 10px 12px; border-radius: 12px; cursor: pointer; font-weight: 600; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .muted { color:#6b7280; font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .ok { color:#065f46; }
+    .bad { color:#991b1b; }
+    pre { white-space: pre; overflow: auto; background:#0b1220; color:#e5e7eb; padding: 12px; border-radius: 12px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 860px){ .grid { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>DEGIRO export → <span class="mono">transactions.csv</span> for your dashboard</h1>
+    <p>This converts a DEGIRO <span class="mono">Transactions.csv</span> (same structure as your <span class="mono">Transactions (5).csv</span>) into the column format required by <span class="mono">dashboard5.html</span>:</p>
+    <p class="mono muted">Date, Ticker, Type, Quantity, Price, Fee, Currency, Name, Account</p>
+    <p class="muted">Notes: Date is converted to <span class="mono">YYYY-MM-DD</span>. BUY/SELL is inferred from the sign of <span class="mono">Aantal</span>. Fees are converted into the instrument currency using <span class="mono">Wisselkoers</span> (fallback: Lokale waarde / Waarde EUR).</p>
+
+    <div class="grid">
+      <div>
+        <label for="inFile">1) Choose DEGIRO transactions CSV</label>
+        <input id="inFile" type="file" accept=".csv,text/csv" />
+        <p class="muted">Your DEGIRO export contains Dutch headers (Datum, Product, Aantal, Koers, …). This converter expects that.</p>
+      </div>
+
+      <div>
+        <label for="mapFile">2) Optional: upload an ISIN→Ticker mapping CSV</label>
+        <input id="mapFile" type="file" accept=".csv,text/csv" />
+        <p class="muted">If you want real online prices, map ISINs to Stooq-style symbols (e.g. <span class="mono">IE00B3XXRP09 → VUSA.UK</span>). Mapping CSV can be 2 columns (ISIN,Ticker) or have headers.</p>
+      </div>
+    </div>
+
+    <div class="row">
+      <div style="flex:1 1 420px">
+        <label for="mapText">Or paste mapping (ISIN,Ticker per line)</label>
+        <textarea id="mapText" placeholder="IE00B3XXRP09,VUSA.UK&#10;IE0032077012,EQQQ.FR"></textarea>
+        <div class="muted">If both mapping file and pasted mapping exist, pasted mapping wins.</div>
+      </div>
+      <div style="flex:0 0 240px">
+        <label>&nbsp;</label>
+        <button id="convertBtn" disabled>Convert & download</button>
+        <p id="status" class="muted" style="margin-top:10px">Pick an input file…</p>
+      </div>
+    </div>
+
+    <div style="margin-top: 14px">
+      <label>Preview (first ~20 lines)</label>
+      <pre id="preview">(nothing yet)</pre>
+    </div>
+  </div>
+
+<script>
+  // ---------- tiny CSV reader (handles quotes, commas, CRLF) ----------
+  function parseCSV(text){
+    const rows = [];
+    let row = [];
+    let cur = '';
+    let inQuotes = false;
+
+    for (let i=0; i<text.length; i++){
+      const c = text[i];
+
+      if (inQuotes){
+        if (c === '"'){
+          const next = text[i+1];
+          if (next === '"'){ cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += c;
+        continue;
+      }
+
+      if (c === '"'){ inQuotes = true; continue; }
+      if (c === ','){ row.push(cur); cur=''; continue; }
+      if (c === '\n'){
+        row.push(cur); cur='';
+        if (row.some(x => String(x||'').trim() !== '')) rows.push(row);
+        row = [];
+        continue;
+      }
+      if (c === '\r') continue;
+
+      cur += c;
+    }
+    row.push(cur);
+    if (row.some(x => String(x||'').trim() !== '')) rows.push(row);
+    return rows;
+  }
+
+  function normHeader(s){
+    return String(s||'').trim().toLowerCase().replace(/\s+/g,'').replace(/[_-]/g,'');
+  }
+
+  function parseNumEU(x){
+    if (x == null) return null;
+    let s = String(x).trim();
+    if (!s) return null;
+    s = s.replace(/[€$£]/g,'').replace(/\s/g,'');
+    let neg = false;
+    if (s.startsWith('(') && s.endsWith(')')){ neg=true; s=s.slice(1,-1); }
+    // Dutch style: 1.234,56
+    if (s.includes(',') && s.includes('.')){
+      if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g,'').replace(',', '.');
+      else s = s.replace(/,/g,''); // 1,234.56
+    } else if (s.includes(',')){
+      s = s.replace(/\./g,'').replace(',', '.');
+    } else {
+      s = s.replace(/,/g,'');
+    }
+    const v = Number(s);
+    if (!Number.isFinite(v)) return null;
+    return neg ? -v : v;
+  }
+
+  function toISODate_DDMMYYYY(s){
+    const t = String(s||'').trim();
+    const m = t.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (!m) return null;
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+
+  function csvEscape(v){
+    const s = String(v ?? '');
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+    return s;
+  }
+
+  function downloadText(filename, text){
+    const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  }
+
+  async function readFileText(file){
+    return await file.text();
+  }
+
+  // ---------- mapping helpers ----------
+  function parseMappingFromText(text){
+    const map = new Map();
+    const lines = String(text||'').split(/\r?\n/);
+    for (const line of lines){
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const parts = t.split(',').map(x => x.trim());
+      if (parts.length < 2) continue;
+      const isin = parts[0].toUpperCase();
+      const ticker = parts[1].toUpperCase();
+      if (isin && ticker) map.set(isin, ticker);
+    }
+    return map;
+  }
+
+  function parseMappingCsv(csvText){
+    const rows = parseCSV(csvText);
+    if (!rows.length) return new Map();
+    const header = rows[0].map(normHeader);
+    // detect headered vs 2-col raw
+    let iIsin = header.indexOf('isin');
+    let iTicker = header.indexOf('ticker');
+    if (iTicker < 0) iTicker = header.indexOf('symbol');
+    const map = new Map();
+
+    const start = (iIsin >= 0 && iTicker >= 0) ? 1 : 0;
+    for (let r=start; r<rows.length; r++){
+      const row = rows[r];
+      const isin = String(row[iIsin >= 0 ? iIsin : 0] || '').trim().toUpperCase();
+      const ticker = String(row[iTicker >= 0 ? iTicker : 1] || '').trim().toUpperCase();
+      if (isin && ticker) map.set(isin, ticker);
+    }
+    return map;
+  }
+
+  // ---------- main conversion ----------
+  function convertDegiroToDashboard(degiroCsvText, isinToTicker){
+    const rows = parseCSV(degiroCsvText);
+    if (!rows.length) throw new Error('Input CSV is empty.');
+
+    const headerRaw = rows[0];
+    const header = headerRaw.map(normHeader);
+
+    const find = (key) => header.indexOf(normHeader(key));
+
+    const iDate  = find('Datum');
+    const iName  = find('Product');
+    const iIsin  = find('ISIN');
+    const iQty   = find('Aantal');
+    const iPrice = find('Koers');
+    const iLocalVal = find('Lokale waarde');
+    const iValEur = find('Waarde EUR');
+    const iFx    = find('Wisselkoers');
+    const iAutoFx = find('AutoFX Kosten');
+    const iFeesEur = find('Transactiekosten en/of kosten van derden EUR');
+
+    if (iDate < 0 || iQty < 0 || iPrice < 0 || iIsin < 0){
+      throw new Error('Missing required DEGIRO columns. Expected at least: Datum, ISIN, Aantal, Koers.');
+    }
+
+    // currency columns are blank headers directly after Koers and after Lokale waarde
+    const iCcyAfterPrice = (headerRaw[iPrice+1] === '') ? (iPrice+1) : -1;
+    const iCcyAfterLocal = (iLocalVal >= 0 && headerRaw[iLocalVal+1] === '') ? (iLocalVal+1) : -1;
+
+    const outRows = [];
+    // dashboard expected header
+    outRows.push(['Date','Ticker','Type','Quantity','Price','Fee','Currency','Name','Account']);
+
+    for (let r=1; r<rows.length; r++){
+      const row = rows[r];
+      const iso = toISODate_DDMMYYYY(row[iDate]);
+      if (!iso) continue;
+
+      const qRaw = parseNumEU(row[iQty]);
+      if (!qRaw || qRaw === 0) continue;
+
+      const type = (qRaw > 0) ? 'BUY' : 'SELL';
+      const qty = Math.abs(qRaw);
+
+      const price = parseNumEU(row[iPrice]);
+      if (price == null) continue;
+
+      const isin = String(row[iIsin] || '').trim().toUpperCase();
+      const name = iName >= 0 ? String(row[iName] || '').trim() : '';
+      const ccy = String(
+        (iCcyAfterLocal >= 0 ? row[iCcyAfterLocal] : '') ||
+        (iCcyAfterPrice >= 0 ? row[iCcyAfterPrice] : '') ||
+        'EUR'
+      ).trim().toUpperCase() || 'EUR';
+
+      // FX: prefer Wisselkoers, else derive from Lokale waarde / Waarde EUR
+      const localVal = iLocalVal >= 0 ? parseNumEU(row[iLocalVal]) : null;
+      const valEur = iValEur >= 0 ? parseNumEU(row[iValEur]) : null;
+      let fx = iFx >= 0 ? parseNumEU(row[iFx]) : null;
+      if (fx == null && localVal != null && valEur != null && valEur !== 0){
+        fx = Math.abs(localVal) / Math.abs(valEur);
+      }
+
+      const feeEur = Math.abs((iFeesEur >= 0 ? (parseNumEU(row[iFeesEur]) || 0) : 0) + (iAutoFx >= 0 ? (parseNumEU(row[iAutoFx]) || 0) : 0));
+      const feeLocal = (ccy === 'EUR' || !fx) ? feeEur : (feeEur * fx);
+
+      const ticker = (isinToTicker && isinToTicker.has(isin)) ? isinToTicker.get(isin) : (isin || name || 'UNKNOWN');
+
+      outRows.push([
+        iso,
+        ticker,
+        type,
+        String(qty),
+        String(price),
+        String(feeLocal || 0),
+        ccy,
+        name,
+        'DEGIRO'
+      ]);
+    }
+
+    if (outRows.length <= 1) throw new Error('No usable rows found. (Date parsing expects DD-MM-YYYY.)');
+
+    // stringify
+    const csv = outRows.map(r => r.map(csvEscape).join(',')).join('\n');
+    return { csv, preview: csv.split('\n').slice(0, 20).join('\n'), rows: outRows.length-1 };
+  }
+
+  // ---------- wire UI ----------
+  const inFile = document.getElementById('inFile');
+  const mapFile = document.getElementById('mapFile');
+  const mapText = document.getElementById('mapText');
+  const btn = document.getElementById('convertBtn');
+  const status = document.getElementById('status');
+  const preview = document.getElementById('preview');
+
+  function setStatus(msg, bad=false){
+    status.textContent = msg;
+    status.className = bad ? 'muted bad' : 'muted ok';
+  }
+
+  function refreshButton(){
+    btn.disabled = !inFile.files || !inFile.files[0];
+    if (!btn.disabled) setStatus('Ready to convert.', false);
+    else { status.textContent = 'Pick an input file…'; status.className = 'muted'; }
+  }
+
+  inFile.addEventListener('change', refreshButton);
+  refreshButton();
+
+  btn.addEventListener('click', async () => {
+    try {
+      btn.disabled = true;
+      setStatus('Reading files…', false);
+
+      const degiroText = await readFileText(inFile.files[0]);
+
+      // mapping: paste wins; else file; else none
+      let mapping = new Map();
+      const pasted = mapText.value.trim();
+      if (pasted){
+        mapping = parseMappingFromText(pasted);
+      } else if (mapFile.files && mapFile.files[0]){
+        const mapCsv = await readFileText(mapFile.files[0]);
+        mapping = parseMappingCsv(mapCsv);
+      }
+
+      setStatus('Converting…', false);
+      const { csv, preview: pv, rows } = convertDegiroToDashboard(degiroText, mapping);
+
+      preview.textContent = pv;
+      setStatus(`Done. Converted ${rows} rows. Downloading…`, false);
+
+      downloadText('transactions.csv', csv);
+    } catch (e){
+      preview.textContent = '(nothing)';
+      setStatus(String(e && e.message ? e.message : e), true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
