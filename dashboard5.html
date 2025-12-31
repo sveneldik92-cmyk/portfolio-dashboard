@@ -356,7 +356,7 @@
               <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiTotalValue">—</div>
               <div class="mt-3 flex items-center gap-2">
                 <span class="text-xs px-2 py-1 rounded-lg border" id="kpiValueDeltaBadge">—</span>
-                <span class="text-xs text-slate-500">vs prior day</span>
+                <span class="text-xs text-slate-500" id="kpiValueSub">vs prior day</span>
               </div>
             </div>
 
@@ -365,7 +365,7 @@
               <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiCash">—</div>
               <div class="mt-3 flex items-center gap-2">
                 <span class="text-xs px-2 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 mono" id="kpiCashPct">—</span>
-                <span class="text-xs text-slate-500">of portfolio</span>
+                <span class="text-xs text-slate-500" id="kpiCashSub">of portfolio</span>
               </div>
             </div>
 
@@ -374,7 +374,7 @@
               <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiVolatility">—</div>
               <div class="mt-3 flex items-center gap-2">
                 <span class="text-xs px-2 py-1 rounded-lg border mono" id="kpiVolDeltaBadge">—</span>
-                <span class="text-xs text-slate-500">Δ vs prior 12M</span>
+                <span class="text-xs text-slate-500" id="kpiVolSub">Δ vs prior 12M</span>
               </div>
             </div>
 
@@ -605,6 +605,9 @@
     function money(n, currency){
       const nf = new Intl.NumberFormat('en-US', { style:'currency', currency, maximumFractionDigits: 0 });
       return nf.format(n);
+    }
+    function signedMoney(n, currency){
+      return `${n>=0?'+':''}${money(n, currency)}`;
     }
     function badgeClass(value){
       if (value >= 0) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -1092,16 +1095,17 @@
         <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200">
           <div class="text-[11px] text-slate-500">${x.label}</div>
           <div class="mt-1 flex items-baseline justify-between gap-2">
-            <div class="text-sm font-semibold mono text-slate-900">${x.port>=0?'+':''}${pct(x.port,2)}</div>
-            <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.delta)} mono">${x.delta>=0?'+':''}${pct(x.delta,2)}</div>
+            <div class="text-sm font-semibold mono text-slate-900">${x.mainText}</div>
+            <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.badgeValue)} mono">${x.badgeText}</div>
           </div>
-          <div class="mt-1 text-[11px] text-slate-500">Δ vs Benchmark</div>
+          <div class="mt-1 text-[11px] text-slate-500">${x.subLabel || 'Δ vs Benchmark'}</div>
         </div>
       `).join('');
     }
 
     function renderKpis(rowsForAll, win){
       const { portEUR, cashEURSeries, cashPct } = portfolioSeriesEUR(rowsForAll, win.startIdx, win.endIdx);
+      const showAbs = state.chartMode === 'abs';
 
       // convert EUR series to display currency with daily FX (if USD)
       const portDisp = portEUR.map((v,i)=> eurToDisplay(v, win.startIdx + i));
@@ -1111,14 +1115,26 @@
       const prev = portDisp[Math.max(0, portDisp.length-2)];
       const deltaDay = prev ? ((last/prev) - 1) : 0;
 
-      document.getElementById('kpiTotalValue').textContent = money(last, state.currency);
+      const kpiValueMain = showAbs ? money(last, state.currency) : `${deltaDay>=0?'+':''}${pct(deltaDay,2)}`;
+      const kpiValueBadge = showAbs ? `${deltaDay>=0?'+':''}${pct(deltaDay,2)}` : money(last, state.currency);
+      document.getElementById('kpiTotalValue').textContent = kpiValueMain;
       const valBadge = document.getElementById('kpiValueDeltaBadge');
-      valBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(deltaDay)} mono`;
-      valBadge.textContent = `${deltaDay>=0?'+':''}${pct(deltaDay,2)}`;
+      valBadge.className = showAbs
+        ? `text-xs px-2 py-1 rounded-lg border ${badgeClass(deltaDay)} mono`
+        : 'text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-700 mono';
+      valBadge.textContent = kpiValueBadge;
+      document.getElementById('kpiValueSub').textContent = showAbs ? 'vs prior day' : 'total value';
 
       const cash = cashDisp[cashDisp.length-1] || 0;
-      document.getElementById('kpiCash').textContent = money(cash, state.currency);
-      document.getElementById('kpiCashPct').textContent = pct(cashPct, 1);
+      const cashMain = showAbs ? money(cash, state.currency) : pct(cashPct, 1);
+      const cashBadge = showAbs ? pct(cashPct, 1) : money(cash, state.currency);
+      document.getElementById('kpiCash').textContent = cashMain;
+      const cashBadgeEl = document.getElementById('kpiCashPct');
+      cashBadgeEl.textContent = cashBadge;
+      cashBadgeEl.className = showAbs
+        ? 'text-xs px-2 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 mono'
+        : 'text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-700 mono';
+      document.getElementById('kpiCashSub').textContent = showAbs ? 'of portfolio' : 'cash position';
 
       // volatility on display series (includes FX if USD)
       const fullStart = 0;
@@ -1137,21 +1153,32 @@
       const volPrior = computeVol(full, Math.max(1, endIdxFull - 252), 252);
       const volDelta = vol12 - volPrior;
 
-      document.getElementById('kpiVolatility').textContent = pct(vol12, 2);
+      document.getElementById('kpiVolatility').textContent = showAbs ? pct(vol12, 2) : `${volDelta>=0?'+':''}${pct(volDelta,2)}`;
       const volBadge = document.getElementById('kpiVolDeltaBadge');
-      volBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(volDelta)} mono`;
-      volBadge.textContent = `${volDelta>=0?'+':''}${pct(volDelta,2)}`;
+      volBadge.className = showAbs
+        ? `text-xs px-2 py-1 rounded-lg border ${badgeClass(volDelta)} mono`
+        : 'text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-700 mono';
+      volBadge.textContent = showAbs ? `${volDelta>=0?'+':''}${pct(volDelta,2)}` : pct(vol12, 2);
+      document.getElementById('kpiVolSub').textContent = showAbs ? 'Δ vs prior 12M' : '12M volatility';
 
       // Benchmark in window
       const benchWin = (dataStore.fullBench || []).slice(win.startIdx, win.endIdx+1);
+      const startVal = portDisp[0] || 0;
       const totalRet = returnBetween(portDisp, 0, portDisp.length-1);
       const benchRet = returnBetween(benchWin, 0, benchWin.length-1);
       const deltaBench = totalRet - benchRet;
+      const totalRetAbs = last - startVal;
+      const benchRetAbs = startVal * benchRet;
+      const deltaBenchAbs = totalRetAbs - benchRetAbs;
 
-      document.getElementById('kpiTotalReturn').textContent = `${totalRet>=0?'+':''}${pct(totalRet,2)}`;
+      document.getElementById('kpiTotalReturn').textContent = showAbs
+        ? signedMoney(totalRetAbs, state.currency)
+        : `${totalRet>=0?'+':''}${pct(totalRet,2)}`;
       const totalBadge = document.getElementById('kpiTotalDeltaBadge');
-      totalBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(deltaBench)} mono`;
-      totalBadge.textContent = `${deltaBench>=0?'+':''}${pct(deltaBench,2)}`;
+      totalBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(showAbs ? deltaBench : deltaBenchAbs)} mono`;
+      totalBadge.textContent = showAbs
+        ? `${deltaBench>=0?'+':''}${pct(deltaBench,2)}`
+        : signedMoney(deltaBenchAbs, state.currency);
 
       // row2 returns (always based on full history up to latest date, not the slider)
       const endGlobal = BUSINESS_DAYS.length - 1;
@@ -1177,7 +1204,18 @@
         const fromIdx = clampGlobal(fromIdxGlobal);
         const portR = returnBetween(portFullDisp, fromIdx, endGlobal);
         const benchR = returnBetween(benchFull, fromIdx, endGlobal);
-        return { label, port: portR, delta: portR - benchR };
+        const startVal = portFullDisp[fromIdx] || 0;
+        const endVal = portFullDisp[endGlobal] || 0;
+        const portAbs = endVal - startVal;
+        const benchAbs = startVal * benchR;
+        const deltaAbs = portAbs - benchAbs;
+        const deltaPct = portR - benchR;
+        return {
+          label,
+          mainText: showAbs ? signedMoney(portAbs, state.currency) : `${portR>=0?'+':''}${pct(portR,2)}`,
+          badgeText: showAbs ? `${deltaPct>=0?'+':''}${pct(deltaPct,2)}` : signedMoney(deltaAbs, state.currency),
+          badgeValue: showAbs ? deltaPct : deltaAbs
+        };
       };
 
       renderKpiReturnRow2([
