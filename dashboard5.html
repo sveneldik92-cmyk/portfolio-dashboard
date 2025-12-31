@@ -1368,6 +1368,16 @@
       el.innerHTML = items.map(x => `
         <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200">
           <div class="text-[11px] text-slate-500">${x.label}</div>
+          <div class="mt-2 flex items-baseline justify-between gap-2">
+            <div class="text-sm font-semibold mono text-slate-900">${x.mainText}</div>
+            <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.mainDeltaValue)} mono">${x.mainDeltaText}</div>
+          </div>
+          <div class="text-[11px] text-slate-500">Δ vs Benchmark</div>
+          <div class="mt-2 flex items-baseline justify-between gap-2">
+            <div class="text-[11px] font-medium mono text-slate-600">${x.secondaryText}</div>
+            <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.secondaryDeltaValue)} mono">${x.secondaryDeltaText}</div>
+          </div>
+          <div class="text-[11px] text-slate-500">Δ vs Benchmark</div>
           <div class="mt-1 flex items-baseline justify-between gap-2">
             <div class="text-sm font-semibold mono text-slate-900">${x.mainText}</div>
             <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.badgeValue)} mono">${x.badgeText}</div>
@@ -1487,6 +1497,11 @@
         return {
           label,
           mainText: showAbs ? signedMoney(portAbs, state.currency) : `${portR>=0?'+':''}${pct(portR,2)}`,
+          mainDeltaText: showAbs ? signedMoney(deltaAbs, state.currency) : `${deltaPct>=0?'+':''}${pct(deltaPct,2)}`,
+          mainDeltaValue: showAbs ? deltaAbs : deltaPct,
+          secondaryText: showAbs ? `${portR>=0?'+':''}${pct(portR,2)}` : signedMoney(portAbs, state.currency),
+          secondaryDeltaText: showAbs ? `${deltaPct>=0?'+':''}${pct(deltaPct,2)}` : signedMoney(deltaAbs, state.currency),
+          secondaryDeltaValue: showAbs ? deltaPct : deltaAbs
           badgeText: showAbs ? `${deltaPct>=0?'+':''}${pct(deltaPct,2)}` : signedMoney(deltaAbs, state.currency),
           badgeValue: showAbs ? deltaPct : deltaAbs
         };
