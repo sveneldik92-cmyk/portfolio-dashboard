@@ -102,7 +102,7 @@
         </div>
 
         <!-- Date range slider: month-level dual range (up to 5Y) -->
-        <div class="mt-4 p-4 rounded-2xl border border-slate-200 bg-slate-50">
+        <div class="mt-4 p-3 rounded-2xl border border-slate-200 bg-slate-50">
           <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div>
               <div class="text-xs text-slate-500">Date range (5Y timeline • month-level granularity)</div>
@@ -117,6 +117,14 @@
             </div>
 
             <div class="flex items-center gap-2 flex-wrap">
+              <button id="preset1m"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Last 1M
+              </button>
+              <button id="preset1q"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Last 1Q
+              </button>
               <button id="preset12m"
                 class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
                 Last 12M
@@ -132,7 +140,7 @@
             </div>
           </div>
 
-          <div class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-3">
+          <div class="mt-3 grid grid-cols-1 md:grid-cols-12 gap-3">
             <div class="md:col-span-6">
               <div class="flex items-center justify-between">
                 <label for="startMonth" class="text-xs font-medium text-slate-600">Start</label>
@@ -183,7 +191,7 @@
                 </div>
                 <div class="mt-2">
                   <div class="font-medium">Optional enrichment</div>
-                  <div class="mono mt-1">Name, Region (Americas/Europe/APAC/Other), Sector, Account, Notes</div>
+                  <div class="mono mt-1">Name, Asset Class (Stocks/Precious Metals/Crypto/Other), Sector, Account, Notes</div>
                 </div>
                 <div class="mt-2">
                   <div class="font-medium">Important</div>
@@ -280,13 +288,13 @@
               </div>
 
               <div>
-                <label class="text-xs font-medium text-slate-600">Region (click donut)</label>
+                <label class="text-xs font-medium text-slate-600">Asset class (click chart)</label>
                 <div class="mt-1 flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div class="text-sm text-slate-700">
                     <span class="text-slate-500">Selected:</span>
-                    <span class="font-medium" id="selectedRegionLabel">All</span>
+                    <span class="font-medium" id="selectedAssetClassLabel">All</span>
                   </div>
-                  <button id="clearRegion"
+                  <button id="clearAssetClass"
                     class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
                     Clear
                   </button>
@@ -391,7 +399,7 @@
               <div class="mt-1 text-2xl font-semibold tracking-tight mono" id="kpiTotalReturn">—</div>
               <div class="mt-3 flex items-center gap-2">
                 <span class="text-xs px-2 py-1 rounded-lg border mono" id="kpiTotalDeltaBadge">—</span>
-                <span class="text-xs text-slate-500">Δ vs Benchmark</span>
+                <span class="text-xs text-slate-500" id="kpiTotalDeltaLabel">Δ vs Benchmark</span>
               </div>
             </div>
           </div>
@@ -442,7 +450,7 @@
               <div class="xl:col-span-4">
                 <div class="flex items-center justify-between">
                   <div>
-                    <h3 class="text-sm font-semibold text-slate-800">Allocation by Region</h3>
+                    <h3 class="text-sm font-semibold text-slate-800">Allocation by Asset Class</h3>
                     <p class="text-xs text-slate-500 mt-1">Click a segment to filter holdings (click again to reset).</p>
                   </div>
                   <button id="resetAllocation"
@@ -502,12 +510,12 @@
             <div class="p-4 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <span class="font-medium text-slate-700">Shareable state:</span>
-                <span class="text-slate-500">#start=…&end=…&currency=…&region=…&chartMode=…&benchmark=…</span>
+                <span class="text-slate-500">#start=…&end=…&currency=…&assetClass=…&chartMode=…&benchmark=…</span>
               </div>
               <div class="text-slate-500">
                 Current: currency=<span class="font-medium text-slate-700" id="stateCurrency"></span>,
                 benchmark=<span class="font-medium text-slate-700" id="stateBenchmark"></span>,
-                region=<span class="font-medium text-slate-700" id="stateRegion"></span>
+                asset class=<span class="font-medium text-slate-700" id="stateAssetClass"></span>
               </div>
             </div>
           </div>
@@ -999,7 +1007,7 @@
       benchmarkOn: true,
       chartMode: 'abs', // 'abs' | 'pct'
       theme: 'light',
-      region: 'All',
+      assetClass: 'All',
       sector: 'All',
       account: 'All',
       search: '',
@@ -1049,7 +1057,7 @@
     function holdingsFiltered(includeSearch=true){
       const q = includeSearch ? (state.search || '').toLowerCase().trim() : '';
       return dataStore.holdings
-        .filter(h => state.region === 'All' ? true : h.region === state.region)
+        .filter(h => state.assetClass === 'All' ? true : h.assetClass === state.assetClass)
         .filter(h => state.sector === 'All' ? true : h.sector === state.sector)
         .filter(h => state.account === 'All' ? true : (h.account === state.account))
         .filter(h => {
@@ -1057,7 +1065,7 @@
           return h.ticker.toLowerCase().includes(q) ||
                  h.name.toLowerCase().includes(q) ||
                  (h.sector||'').toLowerCase().includes(q) ||
-                 (h.region||'').toLowerCase().includes(q) ||
+                 (h.assetClass||'').toLowerCase().includes(q) ||
                  (h.account||'').toLowerCase().includes(q);
         });
     }
@@ -1133,19 +1141,25 @@
     ============================================================ */
     function renderKpiReturnRow2(items){
       const el = document.getElementById('kpiReturnRow2');
+      const showBench = state.benchmarkOn;
+      const deltaLabelClass = showBench ? 'text-[11px] text-slate-400' : 'text-[11px] text-slate-400 hidden';
+      const deltaBadgeClass = (value) => showBench
+        ? `text-[11px] px-2 py-1 rounded-lg border ${badgeClass(value)} mono`
+        : 'text-[11px] px-2 py-1 rounded-lg border hidden';
       el.innerHTML = items.map(x => `
         <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-          <div class="text-[11px] text-slate-500">${x.label}</div>
+          <div class="flex items-center justify-between">
+            <div class="text-[11px] text-slate-500">${x.label}</div>
+            <div class="${deltaLabelClass}">Δ vs Benchmark</div>
+          </div>
           <div class="mt-2 flex items-baseline justify-between gap-2">
             <div class="text-sm font-semibold mono text-slate-900">${x.mainText}</div>
-            <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.mainDeltaValue)} mono">${x.mainDeltaText}</div>
+            <div class="${deltaBadgeClass(x.mainDeltaValue)}">${x.mainDeltaText}</div>
           </div>
-          <div class="text-[11px] text-slate-500">Δ vs Benchmark</div>
           <div class="mt-2 flex items-baseline justify-between gap-2">
             <div class="text-[11px] font-medium mono text-slate-600">${x.secondaryText}</div>
-            <div class="text-[11px] px-2 py-1 rounded-lg border ${badgeClass(x.secondaryDeltaValue)} mono">${x.secondaryDeltaText}</div>
+            <div class="${deltaBadgeClass(x.secondaryDeltaValue)}">${x.secondaryDeltaText}</div>
           </div>
-          <div class="text-[11px] text-slate-500">Δ vs Benchmark</div>
         </div>
       `).join('');
     }
@@ -1153,6 +1167,7 @@
     function renderKpis(rowsForAll, win){
       const { portEUR, cashEURSeries, cashPct } = portfolioSeriesEUR(rowsForAll, win.startIdx, win.endIdx);
       const showAbs = state.chartMode === 'abs';
+      const showBench = state.benchmarkOn;
 
       // convert EUR series to display currency with daily FX (if USD)
       const portDisp = portEUR.map((v,i)=> eurToDisplay(v, win.startIdx + i));
@@ -1222,7 +1237,11 @@
         ? signedMoney(totalRetAbs, state.currency)
         : `${totalRet>=0?'+':''}${pct(totalRet,2)}`;
       const totalBadge = document.getElementById('kpiTotalDeltaBadge');
-      totalBadge.className = `text-xs px-2 py-1 rounded-lg border ${badgeClass(showAbs ? deltaBench : deltaBenchAbs)} mono`;
+      totalBadge.className = showBench
+        ? `text-xs px-2 py-1 rounded-lg border ${badgeClass(showAbs ? deltaBench : deltaBenchAbs)} mono`
+        : 'text-xs px-2 py-1 rounded-lg border hidden';
+      const totalLabel = document.getElementById('kpiTotalDeltaLabel');
+      totalLabel.className = showBench ? 'text-xs text-slate-500' : 'text-xs text-slate-500 hidden';
       totalBadge.textContent = showAbs
         ? `${deltaBench>=0?'+':''}${pct(deltaBench,2)}`
         : signedMoney(deltaBenchAbs, state.currency);
@@ -1346,23 +1365,20 @@
     /* ============================================================
       DONUT CHART
     ============================================================ */
-    const donutColors = ["#1d4ed8", "#3b82f6", "#60a5fa", "#94a3b8"];
+    const donutColors = (i) => palette(i);
     let donutChart = null;
 
     function computeAllocation(rows, endIdx){
-      const totals = { Americas:0, Europe:0, APAC:0, Other:0 };
+      const totals = new Map();
       rows.forEach(h => {
         const v = valueSeriesEUR(h)[endIdx] || 0;
-        totals[h.region] = (totals[h.region] || 0) + v;
+        const label = h.assetClass || 'Other';
+        totals.set(label, (totals.get(label) || 0) + v);
       });
-      const sum = Object.values(totals).reduce((s,x)=>s+x,0) || 1;
+      const entries = Array.from(totals.entries()).sort((a,b)=>b[1]-a[1]);
+      const sum = entries.reduce((s, [,v])=>s+v,0) || 1;
 
-      return [
-        { label:'Americas', value: totals.Americas / sum },
-        { label:'Europe',   value: totals.Europe   / sum },
-        { label:'APAC',     value: totals.APAC     / sum },
-        { label:'Other',    value: totals.Other    / sum }
-      ];
+      return entries.map(([label, value]) => ({ label, value: value / sum }));
     }
 
     function renderDonutLegend(alloc){
@@ -1370,7 +1386,7 @@
       el.innerHTML = alloc.map((a, i) => `
         <div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200">
           <div class="flex items-center gap-2">
-            <span class="inline-block h-2.5 w-2.5 rounded-full" style="background:${donutColors[i]}"></span>
+            <span class="inline-block h-2.5 w-2.5 rounded-full" style="background:${donutColors(i)}"></span>
             <span class="font-medium text-slate-700">${a.label}</span>
           </div>
           <span class="mono text-slate-700">${pct(a.value, 0)}</span>
@@ -1392,7 +1408,7 @@
           labels,
           datasets: [{
             data: valuesPct,
-            backgroundColor: donutColors,
+            backgroundColor: labels.map((_,i)=>donutColors(i)),
             borderColor: (state.theme === 'dark') ? "#0b1220" : "#ffffff",
             borderWidth: 2,
             hoverOffset: 6
@@ -1410,8 +1426,8 @@
             if (!elements || !elements.length) return;
             const idx = elements[0].index;
             const clicked = labels[idx];
-            state.region = (state.region === clicked) ? 'All' : clicked;
-            document.getElementById('selectedRegionLabel').textContent = state.region;
+            state.assetClass = (state.assetClass === clicked) ? 'All' : clicked;
+            document.getElementById('selectedAssetClassLabel').textContent = state.assetClass;
             syncHashFromState();
             updateAll();
           }
@@ -1491,7 +1507,7 @@
 
     function exportHoldingsCsv(rows){
       const win = currentWindow();
-      const header = ['Name','Ticker','MarketValue','Weight','Return12M','Contribution','Sector','Region','Account','Currency'];
+      const header = ['Name','Ticker','MarketValue','Weight','Return12M','Contribution','Sector','AssetClass','Account','Currency'];
       const lines = [header.join(',')];
       rows.forEach(h => {
         const line = [
@@ -1502,7 +1518,7 @@
           (h.ret12m||0).toFixed(6),
           (h.contrib||0).toFixed(6),
           `"${h.sector||''}"`,
-          `"${h.region||''}"`,
+          `"${h.assetClass||''}"`,
           `"${h.account||''}"`,
           `"${h.currency||''}"`
         ];
@@ -1674,7 +1690,8 @@
 
       rows.forEach((h, i) => {
         const abs = holdingsSeriesDisp[i];
-        const label = (state.account === 'All' && h.account && h.account !== 'All') ? `${h.ticker} (${h.account})` : h.ticker;
+        const nameLabel = h.name || h.ticker;
+        const label = (state.account === 'All' && h.account && h.account !== 'All') ? `${nameLabel} (${h.account})` : nameLabel;
         datasets.push({
           label,
           data: isPct ? rebase(abs) : abs.map(v=>Math.round(v)),
@@ -1792,7 +1809,8 @@
     function syncStateFromHash(){
       const h = fromHash();
       if (h.currency && ['EUR','USD'].includes(h.currency)) state.currency = h.currency;
-      if (h.region) state.region = h.region;
+      if (h.assetClass) state.assetClass = h.assetClass;
+      if (!h.assetClass && h.region) state.assetClass = h.region;
       if (h.sector) state.sector = h.sector;
       if (h.account) state.account = h.account;
 
@@ -1811,7 +1829,7 @@
         start: state.startMonth,
         end: state.endMonth,
         currency: state.currency,
-        region: state.region,
+        assetClass: state.assetClass,
         sector: state.sector,
         account: state.account,
         chartMode: state.chartMode,
@@ -1826,9 +1844,9 @@
     function renderStateFooter(){
       document.getElementById('stateCurrency').textContent = state.currency;
       document.getElementById('stateBenchmark').textContent = state.benchmarkOn ? 'On' : 'Off';
-      document.getElementById('stateRegion').textContent = state.region;
+      document.getElementById('stateAssetClass').textContent = state.assetClass;
       document.getElementById('benchmarkState').textContent = state.benchmarkOn ? 'On' : 'Off';
-      document.getElementById('selectedRegionLabel').textContent = state.region;
+      document.getElementById('selectedAssetClassLabel').textContent = state.assetClass;
       document.getElementById('benchLabel').textContent = dataStore.benchSymbol ? `${dataStore.benchSymbol}` : 'Benchmark';
     }
 
@@ -1864,6 +1882,18 @@
       return 'EUR';
     }
 
+    function inferAssetClass(meta){
+      const text = `${meta.ticker || ''} ${meta.name || ''} ${meta.sector || ''}`.toLowerCase();
+      if (/\b(btc|eth|crypto|sol|xrp|ada|dot)\b/.test(text)) return 'Crypto';
+      if (/(gold|silver|precious|metal)/.test(text)) return 'Precious Metals';
+      if (/(etf|fund|index)/.test(text)) return 'Funds/ETFs';
+      return 'Stocks';
+    }
+    function resolveAssetClass(raw, meta){
+      const trimmed = (raw || '').trim();
+      return trimmed || inferAssetClass(meta || {});
+    }
+
     function parseTransactionsCsvV2(csvText){
       const rows = parseCSV(csvText);
       if (!rows.length) throw new Error('transactions.csv is empty.');
@@ -1886,6 +1916,7 @@
       const iCcy = idx('currency', ['ccy']);
       const iAmount = idx('amount', ['value','cashamount']);
       const iName = idx('name', ['company', 'companyname', 'security', 'instrument', 'product', 'description', 'assetname']);
+      const iAssetClass = idx('assetclass', ['asset class', 'asset_class', 'assettype', 'asset type', 'class']);
       const iRegion = idx('region');
       const iSector = idx('sector');
       const iAccount = idx('account', ['broker','portfolio']);
@@ -1912,7 +1943,9 @@
         const amount = iAmount >= 0 ? (toNum(row[iAmount]) ?? null) : null;
 
         const name = iName >= 0 ? String(row[iName] || '').trim() : '';
+        const assetClassRaw = iAssetClass >= 0 ? String(row[iAssetClass] || '').trim() : '';
         const region = iRegion >= 0 ? String(row[iRegion] || '').trim() : '';
+        const assetClass = assetClassRaw || region;
         const sector = iSector >= 0 ? String(row[iSector] || '').trim() : '';
         const account = iAccount >= 0 ? String(row[iAccount] || '').trim() : 'All';
         const notes = iNotes >= 0 ? String(row[iNotes] || '').trim() : '';
@@ -1932,7 +1965,7 @@
           currency: currency || '',
           amount,
           name,
-          region,
+          assetClass,
           sector,
           account: account || 'All',
           notes
@@ -1960,7 +1993,7 @@
             ticker: t.ticker,
             name: t.name || t.ticker,
             sector: t.sector || 'Other',
-            region: t.region || 'Other',
+            assetClass: resolveAssetClass(t.assetClass, t),
             account: t.account || 'All',
             currency: ccy,
             shares: 0,
@@ -1975,7 +2008,7 @@
         // Prefer latest non-empty metadata
         if (t.name) p.name = t.name;
         if (t.sector) p.sector = t.sector;
-        if (t.region) p.region = t.region;
+        if (t.assetClass) p.assetClass = t.assetClass;
         if (t.notes) p.notes = t.notes;
         if (t.currency) p.currency = t.currency.toUpperCase();
 
@@ -2339,12 +2372,12 @@
       dataStore.cashSeriesEUR.set('All', new Array(BUSINESS_DAYS.length).fill(5000)); // small constant cash for demo
 
       const dummyHoldings = [
-        { ticker:'AAPL.US', account:'Broker A', name:'Apple Inc.',        sector:'Technology',     region:'Americas', currency:'USD', notes:'Demo position', shares:0, avgCostLocal:155, realizedEUR:1800 },
-        { ticker:'MSFT.US', account:'Broker A', name:'Microsoft',         sector:'Technology',     region:'Americas', currency:'USD', notes:'Demo position', shares:0, avgCostLocal:310, realizedEUR:1200 },
-        { ticker:'NVDA.US', account:'Broker B', name:'NVIDIA',            sector:'Semiconductors', region:'Americas', currency:'USD', notes:'Demo position', shares:0, avgCostLocal:420, realizedEUR:2600 },
-        { ticker:'ASML.NL', account:'Broker B', name:'ASML Holding',      sector:'Semiconductors', region:'Europe',   currency:'EUR', notes:'Demo position', shares:0, avgCostLocal:620, realizedEUR: 900 },
-        { ticker:'ULVR.L',  account:'Broker A', name:'Unilever',          sector:'Staples',        region:'Europe',   currency:'GBP', notes:'Demo; GBP treated as EUR for now', shares:0, avgCostLocal:45, realizedEUR:350 },
-        { ticker:'SPY.US',  account:'All',      name:'Global Equity ETF', sector:'ETF',            region:'Other',    currency:'USD', notes:'Demo ETF', shares:0, avgCostLocal:92, realizedEUR:0 }
+        { ticker:'AAPL.US', account:'Broker A', name:'Apple Inc.',        sector:'Technology',     assetClass:'Stocks', currency:'USD', notes:'Demo position', shares:0, avgCostLocal:155, realizedEUR:1800 },
+        { ticker:'MSFT.US', account:'Broker A', name:'Microsoft',         sector:'Technology',     assetClass:'Stocks', currency:'USD', notes:'Demo position', shares:0, avgCostLocal:310, realizedEUR:1200 },
+        { ticker:'NVDA.US', account:'Broker B', name:'NVIDIA',            sector:'Semiconductors', assetClass:'Stocks', currency:'USD', notes:'Demo position', shares:0, avgCostLocal:420, realizedEUR:2600 },
+        { ticker:'ASML.NL', account:'Broker B', name:'ASML Holding',      sector:'Semiconductors', assetClass:'Stocks',   currency:'EUR', notes:'Demo position', shares:0, avgCostLocal:620, realizedEUR: 900 },
+        { ticker:'ULVR.L',  account:'Broker A', name:'Unilever',          sector:'Staples',        assetClass:'Stocks',   currency:'GBP', notes:'Demo; GBP treated as EUR for now', shares:0, avgCostLocal:45, realizedEUR:350 },
+        { ticker:'SPY.US',  account:'All',      name:'Global Equity ETF', sector:'ETF',            assetClass:'Funds/ETFs',    currency:'USD', notes:'Demo ETF', shares:0, avgCostLocal:92, realizedEUR:0 }
       ].map(h => ({ ...h, seriesKey: `${h.ticker}|${h.account}` }));
 
       // Generate price/value series with fixed current value targets
@@ -2458,13 +2491,13 @@
         updateAll();
       });
 
-      document.getElementById('clearRegion').addEventListener('click', () => {
-        state.region = 'All';
+      document.getElementById('clearAssetClass').addEventListener('click', () => {
+        state.assetClass = 'All';
         syncHashFromState();
         updateAll();
       });
       document.getElementById('resetAllocation').addEventListener('click', () => {
-        state.region = 'All';
+        state.assetClass = 'All';
         syncHashFromState();
         updateAll();
       });
@@ -2491,7 +2524,7 @@ State:
 - currency=${state.currency}
 - benchmark=${state.benchmarkOn ? 'On' : 'Off'}
 - chartMode=${state.chartMode}
-- region=${state.region}
+- assetClass=${state.assetClass}
 - sector=${state.sector}
 - account=${state.account}
 - search="${state.search}"
@@ -2517,6 +2550,26 @@ Data:
       });
       endSlider.addEventListener('input', (e)=>{
         state.endMonth = parseInt(e.target.value, 10);
+        updateSliderLabels();
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('preset1m').addEventListener('click', ()=>{
+        state.endMonth = 59;
+        state.startMonth = 59;
+        startSlider.value = state.startMonth;
+        endSlider.value = state.endMonth;
+        updateSliderLabels();
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('preset1q').addEventListener('click', ()=>{
+        state.endMonth = 59;
+        state.startMonth = 59 - 2;
+        startSlider.value = state.startMonth;
+        endSlider.value = state.endMonth;
         updateSliderLabels();
         syncHashFromState();
         updateAll();
