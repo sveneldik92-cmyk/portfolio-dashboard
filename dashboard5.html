@@ -35,7 +35,7 @@
       HEADER BAR
       ========================================================= -->
     <header class="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-200">
-      <div class="max-w-[1440px] mx-auto px-4 sm:px-5 py-4">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-5 py-3">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div class="flex items-center gap-3">
             <div class="h-10 w-10 rounded-xl bg-blue-700 flex items-center justify-center shadow-sm">
@@ -102,7 +102,7 @@
         </div>
 
         <!-- Date range slider: month-level dual range (up to 5Y) -->
-        <div class="mt-4 p-3 rounded-2xl border border-slate-200 bg-slate-50">
+        <div class="mt-3 p-2 rounded-2xl border border-slate-200 bg-slate-50">
           <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div>
               <div class="text-xs text-slate-500">Date range (5Y timeline • month-level granularity)</div>
@@ -111,12 +111,17 @@
                 <span class="text-slate-400 font-medium mx-1">→</span>
                 <span id="rangeLabelEnd">—</span>
               </div>
-              <div class="mt-1 text-xs text-slate-500">
-                In “% Performance” mode, every line is rebased to <span class="font-medium text-slate-700">0%</span> at the left edge.
-              </div>
             </div>
 
             <div class="flex items-center gap-2 flex-wrap">
+              <button id="preset1d"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Last 1D
+              </button>
+              <button id="preset1w"
+                class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                Last 1W
+              </button>
               <button id="preset1m"
                 class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-200">
                 Last 1M
@@ -521,6 +526,28 @@
               </div>
             </div>
           </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <div class="p-4 border-b border-slate-200">
+                <h2 class="text-sm font-semibold text-slate-800">Position Size Overview</h2>
+                <p class="text-xs text-slate-500 mt-1">Each tile scales with the market value at the range end.</p>
+              </div>
+              <div class="p-4">
+                <div id="positionMap" class="grid gap-3" style="grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: 70px;"></div>
+              </div>
+            </section>
+
+            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <div class="p-4 border-b border-slate-200">
+                <h2 class="text-sm font-semibold text-slate-800">Top Performing Holdings</h2>
+                <p class="text-xs text-slate-500 mt-1">Return is calculated over the selected date range.</p>
+              </div>
+              <div class="p-4">
+                <div id="topPerformers" class="space-y-3"></div>
+              </div>
+            </section>
+          </div>
         </section>
       </div>
     </main>
@@ -684,6 +711,17 @@
     function badgeClass(value){
       if (value >= 0) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       return 'bg-rose-50 text-rose-700 border-rose-200';
+    }
+    function truncateNameToSecondSpace(name){
+      if (!name) return '';
+      const firstSpace = name.indexOf(' ');
+      if (firstSpace === -1) return name;
+      const secondSpace = name.indexOf(' ', firstSpace + 1);
+      if (secondSpace === -1) return name;
+      return name.slice(0, secondSpace);
+    }
+    function formatRangeDate(d){
+      return d.toLocaleDateString('en-US', { month:'short', day:'2-digit', year:'2-digit' });
     }
     function downloadText(filename, text) {
       const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -1071,6 +1109,7 @@
       sortDir: 'desc',
       startMonth: 48,
       endMonth: 59,
+      rangeOverrideDays: null,
       drawerTxRows: [],
       drawerTxHolding: null,
       drawerTxCumulative: new Map()
@@ -1086,9 +1125,15 @@
     }
     function currentWindow(){
       const { start, end, sMonth, eMonth } = windowDatesFromSlider();
-      const startIdx = findIndexOnOrAfter(start);
-      const endIdx = findIndexOnOrBefore(end);
-      return { startIdx, endIdx, sMonth, eMonth, start, end };
+      let startIdx = findIndexOnOrAfter(start);
+      let endIdx = findIndexOnOrBefore(end);
+      if (state.rangeOverrideDays) {
+        endIdx = findIndexOnOrBefore(end);
+        startIdx = Math.max(0, endIdx - (state.rangeOverrideDays - 1));
+      }
+      const startDate = BUSINESS_DAYS[startIdx];
+      const endDate = BUSINESS_DAYS[endIdx];
+      return { startIdx, endIdx, sMonth, eMonth, start: startDate, end: endDate };
     }
 
     function eurusdAt(idx){
@@ -1108,6 +1153,19 @@
       if (holdingCurrency === 'USD' && state.currency === 'EUR') return priceLocal / eurusdAt(idx);
       if (holdingCurrency === 'EUR' && state.currency === 'USD') return priceLocal * eurusdAt(idx);
       return priceLocal;
+    }
+    function holdingPriceLocalAt(h, idx){
+      const series = dataStore.fullPriceLocal.get(h.ticker);
+      if (!series) return h.curPriceLocal ?? null;
+      return series[clamp(idx, 0, series.length - 1)] ?? null;
+    }
+    function holdingPriceDisplayAt(h, idx){
+      const pLocal = holdingPriceLocalAt(h, idx);
+      if (pLocal == null) return null;
+      return convertPriceToDisplay(pLocal, h.currency, idx);
+    }
+    function holdingValueDisplayAt(h, idx){
+      return eurToDisplay((valueSeriesEUR(h)[idx] || 0), idx);
     }
 
     /* ============================================================
@@ -1517,8 +1575,8 @@
         if (key === 'name') return r.name;
         if (key === 'shares') return r.shares || 0;
         if (key === 'price') {
-          if (r.curPriceLocal == null) return 0;
-          return convertPriceToDisplay(r.curPriceLocal, r.currency, endIdx);
+          const p = holdingPriceDisplayAt(r, endIdx);
+          return p == null ? 0 : p;
         }
         if (key === 'value') return r.valueEUR;
         if (key === 'weight') return r.weight;
@@ -1555,10 +1613,8 @@
         const nameLabel = h.name || h.ticker || '—';
         const tickerLabel = h.ticker || '—';
         const shares = h.shares || 0;
-        const priceDisplay = h.curPriceLocal == null ? null : convertPriceToDisplay(h.curPriceLocal, h.currency, win.endIdx);
-        const marketValueDisplay = priceDisplay == null
-          ? eurToDisplay((h.valueEUR||0), win.endIdx)
-          : (shares * priceDisplay);
+        const priceDisplay = holdingPriceDisplayAt(h, win.endIdx);
+        const marketValueDisplay = holdingValueDisplayAt(h, win.endIdx);
         const accountLabel = h.account && h.account!=='All' && state.account==='All'
           ? `<span class="ml-2 text-[11px] text-slate-500">(${h.account})</span>`
           : '';
@@ -1586,10 +1642,8 @@
       const lines = [header.join(',')];
       rows.forEach(h => {
         const shares = h.shares || 0;
-        const priceDisplay = h.curPriceLocal == null ? null : convertPriceToDisplay(h.curPriceLocal, h.currency, win.endIdx);
-        const marketValueDisplay = priceDisplay == null
-          ? eurToDisplay((h.valueEUR||0), win.endIdx)
-          : (shares * priceDisplay);
+        const priceDisplay = holdingPriceDisplayAt(h, win.endIdx);
+        const marketValueDisplay = holdingValueDisplayAt(h, win.endIdx);
         const line = [
           `"${String(h.name||'').replace(/"/g,'""')}"`,
           h.ticker,
@@ -1605,6 +1659,72 @@
         lines.push(line.join(','));
       });
       downloadText('holdings_export.csv', lines.join('\n'));
+    }
+
+    function holdingReturnForRange(h, startIdx, endIdx){
+      const pStart = holdingPriceDisplayAt(h, startIdx);
+      const pEnd = holdingPriceDisplayAt(h, endIdx);
+      if (pStart == null || pEnd == null || pStart === 0) return 0;
+      return (pEnd / pStart) - 1;
+    }
+
+    function renderPositionMap(rows, win){
+      const el = document.getElementById('positionMap');
+      if (!el) return;
+      const values = rows.map(h => ({ h, v: valueSeriesEUR(h)[win.endIdx] || 0 }))
+        .filter(r => r.v > 0)
+        .sort((a,b)=>b.v-a.v);
+      const total = values.reduce((s,r)=>s+r.v, 0) || 1;
+      el.innerHTML = values.map(({h, v}, idx) => {
+        const weight = v / total;
+        const colSpan = clamp(Math.round(weight * 12), 2, 12);
+        const rowSpan = clamp(Math.round(weight * 6), 1, 3);
+        const nameLabel = truncateNameToSecondSpace(h.name || h.ticker || '—');
+        const valueDisplay = money(holdingValueDisplayAt(h, win.endIdx), state.currency);
+        return `
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col justify-between"
+            style="grid-column: span ${colSpan} / span ${colSpan}; grid-row: span ${rowSpan} / span ${rowSpan};">
+            <div class="text-xs text-slate-500">${nameLabel}</div>
+            <div class="mt-2 text-sm font-semibold text-slate-800 mono">${valueDisplay}</div>
+            <div class="mt-1 text-[11px] text-slate-500">${pct(weight, 1)} of holdings</div>
+          </div>
+        `;
+      }).join('');
+      if (!values.length){
+        el.innerHTML = '<div class="text-xs text-slate-500">No holdings available for the selected filters.</div>';
+      }
+    }
+
+    function renderTopPerformers(rows, win){
+      const el = document.getElementById('topPerformers');
+      if (!el) return;
+      const items = rows.map(h => ({
+        h,
+        ret: holdingReturnForRange(h, win.startIdx, win.endIdx),
+        value: holdingValueDisplayAt(h, win.endIdx)
+      }))
+      .sort((a,b)=>b.ret-a.ret)
+      .slice(0, 8);
+
+      el.innerHTML = items.map((item, idx) => {
+        const nameLabel = item.h.name || item.h.ticker || '—';
+        const retBadge = `<span class="text-xs px-2 py-1 rounded-lg border ${badgeClass(item.ret)} mono">${item.ret>=0?'+':''}${pct(item.ret,2)}</span>`;
+        return `
+          <div class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50">
+            <div class="flex items-center gap-3">
+              <div class="h-7 w-7 rounded-full bg-white border border-slate-200 text-xs font-semibold flex items-center justify-center text-slate-600">${idx + 1}</div>
+              <div>
+                <div class="text-sm font-semibold text-slate-800">${nameLabel}</div>
+                <div class="text-xs text-slate-500 mono">${money(item.value, state.currency)}</div>
+              </div>
+            </div>
+            ${retBadge}
+          </div>
+        `;
+      }).join('');
+      if (!items.length){
+        el.innerHTML = '<div class="text-xs text-slate-500">No holdings available for the selected filters.</div>';
+      }
     }
 
     /* ============================================================
@@ -1669,11 +1789,11 @@
       document.getElementById('drawerTitle').textContent = nameLabel;
       document.getElementById('drawerTicker').textContent = nameLabel;
       document.getElementById('drawerSector').textContent = h.sector || '—';
-      document.getElementById('drawerValue').textContent = money(eurToDisplay((h.valueEUR||0), endIdx), state.currency);
+      document.getElementById('drawerValue').textContent = money(holdingValueDisplayAt(h, endIdx), state.currency);
       document.getElementById('drawerWeight').textContent = pct(h.weight||0, 2);
 
       const avgCostLocal = (h.avgCostLocal ?? null);
-      const curPriceLocal = (h.curPriceLocal ?? null);
+      const curPriceLocal = holdingPriceLocalAt(h, endIdx);
       const avgDisp = avgCostLocal == null ? null : convertPriceToDisplay(avgCostLocal, h.currency, endIdx);
       const curDisp = curPriceLocal == null ? null : convertPriceToDisplay(curPriceLocal, h.currency, endIdx);
 
@@ -1900,9 +2020,12 @@
       rows.forEach((h, i) => {
         const abs = holdingsSeriesDisp[i];
         const nameLabel = h.name || h.ticker;
-        const label = (state.account === 'All' && h.account && h.account !== 'All') ? `${nameLabel} (${h.account})` : nameLabel;
+        const shortName = truncateNameToSecondSpace(nameLabel);
+        const label = (state.account === 'All' && h.account && h.account !== 'All') ? `${shortName} (${h.account})` : shortName;
+        const fullLabel = (state.account === 'All' && h.account && h.account !== 'All') ? `${nameLabel} (${h.account})` : nameLabel;
         datasets.push({
           label,
+          fullLabel,
           data: isPct ? rebase(abs) : abs.map(v=>Math.round(v)),
           borderColor: palette(i+1),
           backgroundColor: "rgba(0,0,0,0)",
@@ -1955,7 +2078,7 @@
                   return dates[idx].toLocaleDateString('en-US', { year:'numeric', month:'short', day:'2-digit' });
                 },
                 label: (ctx)=>{
-                  const label = ctx.dataset.label || '';
+                  const label = ctx.dataset.fullLabel || ctx.dataset.label || '';
                   const y = ctx.parsed.y;
 
                   if (isPct) return `${label}: ${y>=0?'+':''}${pct(y,2)}`;
@@ -2003,13 +2126,14 @@
       let e = clamp(state.endMonth, 0, 59);
       if (s > e) { const tmp = s; s = e; e = tmp; }
 
-      const startLab = MONTHS[s].label;
-      const endLab = MONTHS[e].label;
+      const win = currentWindow();
+      const startLab = state.rangeOverrideDays ? formatRangeDate(win.start) : MONTHS[s].label;
+      const endLab = state.rangeOverrideDays ? formatRangeDate(win.end) : MONTHS[e].label;
 
       document.getElementById('rangeLabelStart').textContent = startLab;
       document.getElementById('rangeLabelEnd').textContent = endLab;
-      document.getElementById('startMonthVal').textContent = `#${s} • ${startLab}`;
-      document.getElementById('endMonthVal').textContent = `#${e} • ${endLab}`;
+      document.getElementById('startMonthVal').textContent = `#${s} • ${MONTHS[s].label}`;
+      document.getElementById('endMonthVal').textContent = `#${e} • ${MONTHS[e].label}`;
     }
 
     /* ============================================================
@@ -2017,6 +2141,7 @@
     ============================================================ */
     function syncStateFromHash(){
       const h = fromHash();
+      state.rangeOverrideDays = null;
       if (h.currency && ['EUR','USD'].includes(h.currency)) state.currency = h.currency;
       if (h.assetClass) state.assetClass = h.assetClass;
       if (!h.assetClass && h.region) state.assetClass = h.region;
@@ -2077,6 +2202,8 @@
       const sorted = sortHoldings(rowsTable).slice(0, 10);
       setSortIndicator(state.sortKey);
       renderHoldingsTable(sorted);
+      renderPositionMap(rowsTable, win);
+      renderTopPerformers(rowsTable, win);
 
       renderStateFooter();
     }
@@ -2812,12 +2939,36 @@ Data:
 
       startSlider.addEventListener('input', (e)=>{
         state.startMonth = parseInt(e.target.value, 10);
+        state.rangeOverrideDays = null;
         updateSliderLabels();
         syncHashFromState();
         updateAll();
       });
       endSlider.addEventListener('input', (e)=>{
         state.endMonth = parseInt(e.target.value, 10);
+        state.rangeOverrideDays = null;
+        updateSliderLabels();
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('preset1d').addEventListener('click', ()=>{
+        state.endMonth = 59;
+        state.startMonth = 59;
+        state.rangeOverrideDays = 1;
+        startSlider.value = state.startMonth;
+        endSlider.value = state.endMonth;
+        updateSliderLabels();
+        syncHashFromState();
+        updateAll();
+      });
+
+      document.getElementById('preset1w').addEventListener('click', ()=>{
+        state.endMonth = 59;
+        state.startMonth = 59;
+        state.rangeOverrideDays = 5;
+        startSlider.value = state.startMonth;
+        endSlider.value = state.endMonth;
         updateSliderLabels();
         syncHashFromState();
         updateAll();
@@ -2826,6 +2977,7 @@ Data:
       document.getElementById('preset1m').addEventListener('click', ()=>{
         state.endMonth = 59;
         state.startMonth = 59;
+        state.rangeOverrideDays = null;
         startSlider.value = state.startMonth;
         endSlider.value = state.endMonth;
         updateSliderLabels();
@@ -2836,6 +2988,7 @@ Data:
       document.getElementById('preset1q').addEventListener('click', ()=>{
         state.endMonth = 59;
         state.startMonth = 59 - 2;
+        state.rangeOverrideDays = null;
         startSlider.value = state.startMonth;
         endSlider.value = state.endMonth;
         updateSliderLabels();
@@ -2846,6 +2999,7 @@ Data:
       document.getElementById('preset12m').addEventListener('click', ()=>{
         state.endMonth = 59;
         state.startMonth = 59 - 11;
+        state.rangeOverrideDays = null;
         startSlider.value = state.startMonth;
         endSlider.value = state.endMonth;
         updateSliderLabels();
@@ -2862,6 +3016,7 @@ Data:
         }
         state.startMonth = idx;
         state.endMonth = 59;
+        state.rangeOverrideDays = null;
         startSlider.value = state.startMonth;
         endSlider.value = state.endMonth;
         updateSliderLabels();
@@ -2872,6 +3027,7 @@ Data:
       document.getElementById('preset5y').addEventListener('click', ()=>{
         state.startMonth = 0;
         state.endMonth = 59;
+        state.rangeOverrideDays = null;
         startSlider.value = state.startMonth;
         endSlider.value = state.endMonth;
         updateSliderLabels();
