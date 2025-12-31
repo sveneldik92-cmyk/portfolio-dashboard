@@ -498,11 +498,11 @@
                   <tr class="text-left text-xs font-semibold text-slate-600">
                     <th class="px-4 py-3 cursor-pointer select-none" data-sort="name">Name <span class="text-slate-400" id="sort_name"></span></th>
                     <th class="px-4 py-3 cursor-pointer select-none" data-sort="ticker">Ticker <span class="text-slate-400" id="sort_ticker"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="shares">Quantity <span class="text-slate-400" id="sort_shares"></span></th>
+                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="price">Price <span class="text-slate-400" id="sort_price"></span></th>
                     <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="value">Market Value <span class="text-slate-400" id="sort_value"></span></th>
                     <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="weight">Weight <span class="text-slate-400" id="sort_weight"></span></th>
                     <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="ret12m">12M Return <span class="text-slate-400" id="sort_ret12m"></span></th>
-                    <th class="px-4 py-3 text-right cursor-pointer select-none" data-sort="contrib">Contribution <span class="text-slate-400" id="sort_contrib"></span></th>
-                    <th class="px-4 py-3 cursor-pointer select-none" data-sort="sector">Sector <span class="text-slate-400" id="sort_sector"></span></th>
                   </tr>
                 </thead>
                 <tbody id="holdingsBody" class="divide-y divide-slate-100"></tbody>
@@ -1458,17 +1458,21 @@
       TABLE + SORT + CSV EXPORT
     ============================================================ */
     function sortHoldings(rows){
+      const endIdx = currentWindow().endIdx;
       const key = state.sortKey;
       const dir = state.sortDir === 'asc' ? 1 : -1;
 
       const getter = (r) => {
         if (key === 'ticker') return r.ticker;
         if (key === 'name') return r.name;
-        if (key === 'sector') return r.sector;
+        if (key === 'shares') return r.shares || 0;
+        if (key === 'price') {
+          if (r.curPriceLocal == null) return 0;
+          return convertPriceToDisplay(r.curPriceLocal, r.currency, endIdx);
+        }
         if (key === 'value') return r.valueEUR;
         if (key === 'weight') return r.weight;
         if (key === 'ret12m') return r.ret12m;
-        if (key === 'contrib') return r.contrib;
         return r.valueEUR;
       };
 
@@ -1480,7 +1484,7 @@
     }
 
     function clearSortIndicators(){
-      ['ticker','name','value','weight','ret12m','contrib','sector'].forEach(k => {
+      ['ticker','name','shares','price','value','weight','ret12m'].forEach(k => {
         const el = document.getElementById('sort_'+k);
         if (el) el.textContent = '';
       });
@@ -1498,9 +1502,13 @@
 
       tbody.innerHTML = rows.map((h, idx) => {
         const retBadge = `<span class="text-xs px-2 py-1 rounded-lg border ${badgeClass(h.ret12m || 0)} mono">${(h.ret12m||0)>=0?'+':''}${pct(h.ret12m||0,2)}</span>`;
-        const contribBadge = `<span class="text-xs px-2 py-1 rounded-lg border bg-blue-50 text-blue-800 border-blue-200 mono">${(h.contrib||0)>=0?'+':''}${pct(h.contrib||0,2)}</span>`;
         const nameLabel = h.name || h.ticker || '—';
         const tickerLabel = h.ticker || '—';
+        const shares = h.shares || 0;
+        const priceDisplay = h.curPriceLocal == null ? null : convertPriceToDisplay(h.curPriceLocal, h.currency, win.endIdx);
+        const marketValueDisplay = priceDisplay == null
+          ? eurToDisplay((h.valueEUR||0), win.endIdx)
+          : (shares * priceDisplay);
         const accountLabel = h.account && h.account!=='All' && state.account==='All'
           ? `<span class="ml-2 text-[11px] text-slate-500">(${h.account})</span>`
           : '';
@@ -1508,11 +1516,11 @@
           <tr class="hover:bg-slate-50 cursor-pointer" data-row="${idx}">
             <td class="px-4 py-3 text-sm font-semibold text-slate-900">${nameLabel}${accountLabel}</td>
             <td class="px-4 py-3 text-sm text-slate-700 mono">${tickerLabel}</td>
-            <td class="px-4 py-3 text-sm text-slate-700 text-right mono">${money(eurToDisplay((h.valueEUR||0), win.endIdx), state.currency)}</td>
+            <td class="px-4 py-3 text-sm text-slate-700 text-right mono">${num(shares, 2)}</td>
+            <td class="px-4 py-3 text-sm text-slate-700 text-right mono">${priceDisplay == null ? '—' : moneyWithDecimals(priceDisplay, state.currency, 2)}</td>
+            <td class="px-4 py-3 text-sm text-slate-700 text-right mono">${money(marketValueDisplay, state.currency)}</td>
             <td class="px-4 py-3 text-sm text-slate-700 text-right mono">${pct(h.weight||0,1)}</td>
             <td class="px-4 py-3 text-right">${retBadge}</td>
-            <td class="px-4 py-3 text-right">${contribBadge}</td>
-            <td class="px-4 py-3 text-sm text-slate-600">${h.sector || 'Other'}</td>
           </tr>
         `;
       }).join('');
@@ -1524,17 +1532,22 @@
 
     function exportHoldingsCsv(rows){
       const win = currentWindow();
-      const header = ['Name','Ticker','MarketValue','Weight','Return12M','Contribution','Sector','AssetClass','Account','Currency'];
+      const header = ['Name','Ticker','Quantity','Price','MarketValue','Weight','Return12M','AssetClass','Account','Currency'];
       const lines = [header.join(',')];
       rows.forEach(h => {
+        const shares = h.shares || 0;
+        const priceDisplay = h.curPriceLocal == null ? null : convertPriceToDisplay(h.curPriceLocal, h.currency, win.endIdx);
+        const marketValueDisplay = priceDisplay == null
+          ? eurToDisplay((h.valueEUR||0), win.endIdx)
+          : (shares * priceDisplay);
         const line = [
           `"${String(h.name||'').replace(/"/g,'""')}"`,
           h.ticker,
-          (eurToDisplay((h.valueEUR||0), win.endIdx)).toFixed(2),
+          shares.toFixed(6),
+          priceDisplay == null ? '' : priceDisplay.toFixed(6),
+          marketValueDisplay.toFixed(2),
           (h.weight||0).toFixed(6),
           (h.ret12m||0).toFixed(6),
-          (h.contrib||0).toFixed(6),
-          `"${h.sector||''}"`,
           `"${h.assetClass||''}"`,
           `"${h.account||''}"`,
           `"${h.currency||''}"`
@@ -2457,7 +2470,7 @@
           if (state.sortKey === key) state.sortDir = (state.sortDir === 'asc') ? 'desc' : 'asc';
           else {
             state.sortKey = key;
-            state.sortDir = (key === 'ticker' || key === 'name' || key === 'sector') ? 'asc' : 'desc';
+            state.sortDir = (key === 'ticker' || key === 'name') ? 'asc' : 'desc';
           }
           syncHashFromState();
           updateAll();
