@@ -2558,6 +2558,27 @@
       // Create series per holding key: shares step * price (converted to EUR if USD)
       const valueEUR = new Map();
 
+      const latestTransactionPrice = (ticker) => {
+        const tx = (dataStore.transactions || [])
+          .filter(t => t.ticker === ticker && t.price != null)
+          .slice()
+          .sort((a, b) => a.d.getTime() - b.d.getTime());
+        if (!tx.length) return null;
+        const last = tx[tx.length - 1];
+        return Number.isFinite(last.price) ? last.price : null;
+      };
+
+      const fallbackPriceSeries = (ticker, sector, avgCostLocal) => {
+        const lastPrice = latestTransactionPrice(ticker);
+        const anchor = Number.isFinite(lastPrice)
+          ? lastPrice
+          : (Number.isFinite(avgCostLocal) ? avgCostLocal : null);
+        if (anchor != null && anchor > 0){
+          return new Array(BUSINESS_DAYS.length).fill(anchor);
+        }
+        return generatePriceSeries(ticker, sector);
+      };
+
       for (const h of holdings){
         const key = h.seriesKey;
         const ticker = h.ticker;
@@ -2602,7 +2623,8 @@
         }
         h.shares = shares[shares.length-1];
 
-        const pLocal = priceLocalByTicker.get(ticker) || generatePriceSeries(ticker, h.sector);
+        const pLocal = priceLocalByTicker.get(ticker)
+          || fallbackPriceSeries(ticker, h.sector, h.avgCostLocal);
         dataStore.fullPriceLocal.set(ticker, pLocal);
 
         const out = new Array(BUSINESS_DAYS.length);
