@@ -2041,6 +2041,18 @@
       return trimmed || inferAssetClass(meta || {});
     }
 
+    function normalizeTransactionType(value){
+      const t = String(value || '').trim().toUpperCase();
+      if (!t) return null;
+      if (['BUY', 'B'].includes(t)) return 'BUY';
+      if (['SELL', 'S'].includes(t)) return 'SELL';
+      if (['DIV', 'DIVIDEND', 'DIVIDENDS'].includes(t) || t.startsWith('DIV')) return 'DIV';
+      if (['DEPOSIT', 'CREDIT', 'CASHIN'].includes(t)) return 'DEPOSIT';
+      if (['WITHDRAW', 'WITHDRAWAL', 'DEBIT', 'CASHOUT'].includes(t)) return 'WITHDRAW';
+      if (['FEE', 'FEES', 'COST', 'COSTS'].includes(t)) return 'FEE';
+      return null;
+    }
+
     function parseTransactionsCsvV2(csvText){
       const rows = parseCSV(csvText);
       if (!rows.length) throw new Error('transactions.csv is empty.');
@@ -2082,7 +2094,8 @@
 
         const tickerRaw = String(row[iTicker] || '').trim();
         const ticker = tickerRaw ? tickerRaw.toUpperCase() : '';
-        const type = String(row[iType] || '').trim().toUpperCase();
+        const typeRaw = String(row[iType] || '').trim();
+        const type = normalizeTransactionType(typeRaw);
         const quantity = iQty >= 0 ? (toNum(row[iQty]) ?? null) : null;
         const price = iPrice >= 0 ? (toNum(row[iPrice]) ?? null) : null;
         const fee = iFee >= 0 ? (toNum(row[iFee]) ?? 0) : 0;
@@ -2097,15 +2110,13 @@
         const account = iAccount >= 0 ? String(row[iAccount] || '').trim() : 'All';
         const notes = iNotes >= 0 ? String(row[iNotes] || '').trim() : '';
 
-        // Normalize type
-        const normType = ['BUY','SELL','DEPOSIT','WITHDRAW','DIV','FEE'].includes(type) ? type : null;
-        if (!normType) continue;
+        if (!type) continue;
 
         out.push({
           date,
           d,
           ticker,
-          type: normType,
+          type,
           quantity,
           price,
           fee: fee || 0,
