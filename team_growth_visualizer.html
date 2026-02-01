@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Team Growth & Proficiency Visualizer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+      background: #f4f6fb;
+      color: #1c2430;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px 24px 64px;
+      max-width: 1200px;
+      margin-inline: auto;
+      line-height: 1.5;
+    }
+
+    header {
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      max-width: 800px;
+      color: #4b5563;
+    }
+
+    .section {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+      margin-bottom: 24px;
+    }
+
+    .section h2 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .section p {
+      color: #4b5563;
+      margin-top: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      border: 1px solid #e5e7eb;
+      padding: 8px;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: #f8fafc;
+      font-weight: 600;
+    }
+
+    input[type="number"],
+    input[type="text"],
+    select {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 0.9rem;
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      margin-top: 16px;
+    }
+
+    .card {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-top: 16px;
+    }
+
+    .meta label {
+      display: flex;
+      flex-direction: column;
+      font-weight: 600;
+      font-size: 0.85rem;
+      gap: 4px;
+      color: #374151;
+    }
+
+    .note {
+      font-size: 0.85rem;
+      color: #6b7280;
+    }
+
+    .warning {
+      color: #b45309;
+      font-weight: 600;
+    }
+
+    .toggle {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .heat-low {
+      background: #fee2e2;
+    }
+
+    .heat-mid {
+      background: #fef3c7;
+    }
+
+    .heat-high {
+      background: #dcfce7;
+    }
+
+    .chart-wrapper {
+      padding: 16px;
+      border: 1px dashed #cbd5f5;
+      border-radius: 12px;
+      background: #f8fafc;
+    }
+
+    footer {
+      margin-top: 40px;
+      color: #94a3b8;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Team Growth &amp; Proficiency Visualizer</h1>
+    <p>
+      Build a full transformation from quarterly product plans to monthly budgets, then measure how much of each team
+      is still new while they train up to full proficiency. Update any input and the tables + chart will recalculate
+      instantly.
+    </p>
+  </header>
+
+  <section class="section" id="step-1">
+    <h2>1. Current Teams &amp; Quarterly Products</h2>
+    <p>
+      Enter existing headcount, the staffing load per product, and the products planned each quarter. This produces
+      quarterly growth for each team and feeds the remaining steps.
+    </p>
+    <table id="team-table">
+      <thead>
+        <tr>
+          <th>Team</th>
+          <th>Current Staff</th>
+          <th>People / Product</th>
+          <th>Q1 Products</th>
+          <th>Q2 Products</th>
+          <th>Q3 Products</th>
+          <th>Q4 Products</th>
+          <th>Budget / Product</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="text" value="Core Platform" /></td>
+          <td><input type="number" min="0" value="18" /></td>
+          <td><input type="number" min="0" step="0.1" value="0.8" /></td>
+          <td><input type="number" min="0" value="4" /></td>
+          <td><input type="number" min="0" value="5" /></td>
+          <td><input type="number" min="0" value="6" /></td>
+          <td><input type="number" min="0" value="5" /></td>
+          <td><input type="number" min="0" value="55000" /></td>
+        </tr>
+        <tr>
+          <td><input type="text" value="Data Systems" /></td>
+          <td><input type="number" min="0" value="12" /></td>
+          <td><input type="number" min="0" step="0.1" value="0.6" /></td>
+          <td><input type="number" min="0" value="3" /></td>
+          <td><input type="number" min="0" value="4" /></td>
+          <td><input type="number" min="0" value="5" /></td>
+          <td><input type="number" min="0" value="4" /></td>
+          <td><input type="number" min="0" value="42000" /></td>
+        </tr>
+        <tr>
+          <td><input type="text" value="Client Success" /></td>
+          <td><input type="number" min="0" value="15" /></td>
+          <td><input type="number" min="0" step="0.1" value="0.5" /></td>
+          <td><input type="number" min="0" value="5" /></td>
+          <td><input type="number" min="0" value="6" /></td>
+          <td><input type="number" min="0" value="7" /></td>
+          <td><input type="number" min="0" value="6" /></td>
+          <td><input type="number" min="0" value="38000" /></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="grid">
+      <div class="card">
+        <strong>Quarterly Growth (new hires)</strong>
+        <div class="note" id="quarterly-growth"></div>
+      </div>
+      <div class="card">
+        <strong>Quarterly Budget Total</strong>
+        <div class="note" id="quarterly-budget"></div>
+      </div>
+      <div class="card">
+        <strong>Year-End Team Size</strong>
+        <div class="note" id="year-end"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="step-2">
+    <h2>2. Translate Quarter Products to Monthly Budget</h2>
+    <p>
+      Allocate each quarter's products into months (as a % of that quarter). The totals should reach 100% per quarter.
+      This converts quarterly budgets into a monthly timeline.
+    </p>
+    <table id="month-split-table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Q1 Share (%)</th>
+          <th>Q2 Share (%)</th>
+          <th>Q3 Share (%)</th>
+          <th>Q4 Share (%)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Jan</td><td><input type="number" min="0" max="100" value="34" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>Feb</td><td><input type="number" min="0" max="100" value="33" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>Mar</td><td><input type="number" min="0" max="100" value="33" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>Apr</td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="34" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>May</td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="33" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>Jun</td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="33" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>Jul</td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="34" /></td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>Aug</td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="33" /></td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>Sep</td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="33" /></td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>Oct</td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="34" /></td></tr>
+        <tr><td>Nov</td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="33" /></td></tr>
+        <tr><td>Dec</td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="0" /></td><td><input type="number" min="0" max="100" value="33" /></td></tr>
+      </tbody>
+    </table>
+    <div class="meta">
+      <span class="badge" id="quarter-balance"></span>
+      <span class="note">Adjust the shares to see monthly budgets change in real time.</span>
+    </div>
+    <div class="card" style="margin-top: 16px;">
+      <strong>Monthly Budget by Team</strong>
+      <div class="note">
+        <table id="monthly-budget-table"></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="step-3">
+    <h2>3. New Hire Training Curve</h2>
+    <p>
+      Define how quickly new employees reach full proficiency. This curve is applied to each month of hires.
+    </p>
+    <table id="training-table">
+      <thead>
+        <tr>
+          <th>Month Since Hire</th>
+          <th>Training / Proficiency (%)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Month 1</td><td><input type="number" min="0" max="100" value="0" /></td></tr>
+        <tr><td>Month 2</td><td><input type="number" min="0" max="100" value="25" /></td></tr>
+        <tr><td>Month 3</td><td><input type="number" min="0" max="100" value="45" /></td></tr>
+        <tr><td>Month 4</td><td><input type="number" min="0" max="100" value="60" /></td></tr>
+        <tr><td>Month 5</td><td><input type="number" min="0" max="100" value="70" /></td></tr>
+        <tr><td>Month 6</td><td><input type="number" min="0" max="100" value="80" /></td></tr>
+        <tr><td>Month 7</td><td><input type="number" min="0" max="100" value="88" /></td></tr>
+        <tr><td>Month 8</td><td><input type="number" min="0" max="100" value="92" /></td></tr>
+        <tr><td>Month 9</td><td><input type="number" min="0" max="100" value="95" /></td></tr>
+        <tr><td>Month 10</td><td><input type="number" min="0" max="100" value="97" /></td></tr>
+        <tr><td>Month 11</td><td><input type="number" min="0" max="100" value="99" /></td></tr>
+        <tr><td>Month 12</td><td><input type="number" min="0" max="100" value="100" /></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section" id="step-4">
+    <h2>4. Team Proficiency Over Time</h2>
+    <p>
+      Review how much of each team is still new every month. Set a threshold to apply conditional formatting and toggle
+      the chart view.
+    </p>
+    <div class="meta">
+      <label>
+        Proficiency threshold (%)
+        <input type="number" id="threshold" min="0" max="100" value="80" />
+      </label>
+      <label class="toggle">
+        View
+        <select id="view-toggle">
+          <option value="table" selected>Table</option>
+          <option value="chart">Chart</option>
+        </select>
+      </label>
+    </div>
+    <div class="card" style="margin-top: 16px;">
+      <div id="proficiency-table"></div>
+      <div id="proficiency-chart" class="hidden chart-wrapper">
+        <canvas id="chart-canvas" height="120"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <footer>Update inputs to explore different growth, budget, and training scenarios.</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const monthLabels = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+
+    const teamTable = document.getElementById("team-table");
+    const monthSplitTable = document.getElementById("month-split-table");
+    const trainingTable = document.getElementById("training-table");
+    const monthlyBudgetTable = document.getElementById("monthly-budget-table");
+    const quarterlyGrowth = document.getElementById("quarterly-growth");
+    const quarterlyBudget = document.getElementById("quarterly-budget");
+    const yearEnd = document.getElementById("year-end");
+    const quarterBalance = document.getElementById("quarter-balance");
+    const thresholdInput = document.getElementById("threshold");
+    const viewToggle = document.getElementById("view-toggle");
+    const proficiencyTable = document.getElementById("proficiency-table");
+    const proficiencyChart = document.getElementById("proficiency-chart");
+    const chartCanvas = document.getElementById("chart-canvas");
+
+    let chartInstance = null;
+
+    const formatNumber = (value, decimals = 1) => {
+      if (!Number.isFinite(value)) {
+        return "-";
+      }
+      return value.toLocaleString(undefined, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+    };
+
+    const formatCurrency = (value) => {
+      if (!Number.isFinite(value)) {
+        return "-";
+      }
+      return value.toLocaleString(undefined, {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 0,
+      });
+    };
+
+    const readTableInputs = (tableElement) => {
+      const rows = Array.from(tableElement.tBodies[0].rows);
+      return rows.map((row) => Array.from(row.querySelectorAll("input")).map((input) => input.value));
+    };
+
+    const parseTeams = () => {
+      const rows = Array.from(teamTable.tBodies[0].rows);
+      return rows.map((row) => {
+        const inputs = row.querySelectorAll("input");
+        return {
+          name: inputs[0].value || "Team",
+          current: Number(inputs[1].value) || 0,
+          perProduct: Number(inputs[2].value) || 0,
+          products: [3, 4, 5, 6].map((index) => Number(inputs[index].value) || 0),
+          budgetPerProduct: Number(inputs[7].value) || 0,
+        };
+      });
+    };
+
+    const parseMonthSplit = () => {
+      const rows = Array.from(monthSplitTable.tBodies[0].rows);
+      const split = rows.map((row) => {
+        const inputs = row.querySelectorAll("input");
+        return [
+          Number(inputs[0].value) || 0,
+          Number(inputs[1].value) || 0,
+          Number(inputs[2].value) || 0,
+          Number(inputs[3].value) || 0,
+        ];
+      });
+      return split;
+    };
+
+    const parseTrainingCurve = () => {
+      const rows = Array.from(trainingTable.tBodies[0].rows);
+      return rows.map((row) => {
+        const input = row.querySelector("input");
+        return (Number(input.value) || 0) / 100;
+      });
+    };
+
+    const computeQuarterTotals = (teams) => {
+      return teams.map((team) => {
+        const growthByQuarter = team.products.map((products) => products * team.perProduct);
+        const budgetsByQuarter = team.products.map((products) => products * team.budgetPerProduct);
+        return {
+          ...team,
+          growthByQuarter,
+          budgetsByQuarter,
+        };
+      });
+    };
+
+    const toMonthlyFromQuarter = (quarterValues, monthSplit) => {
+      const result = Array(12).fill(0);
+      monthSplit.forEach((month, index) => {
+        const quarterIndex = Math.floor(index / 3);
+        const share = month[quarterIndex] / 100;
+        result[index] = quarterValues[quarterIndex] * share;
+      });
+      return result;
+    };
+
+    const computeMonthlyAllocations = (teams, monthSplit) => {
+      return teams.map((team) => {
+        const hiresMonthly = toMonthlyFromQuarter(team.growthByQuarter, monthSplit);
+        const budgetMonthly = toMonthlyFromQuarter(team.budgetsByQuarter, monthSplit);
+        return {
+          ...team,
+          hiresMonthly,
+          budgetMonthly,
+        };
+      });
+    };
+
+    const computeProficiencyTimeline = (teams, trainingCurve) => {
+      return teams.map((team) => {
+        const totalMonthlyHeadcount = [];
+        const proficiencyMonthly = [];
+
+        for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+          let totalHeadcount = team.current;
+          let effectiveCapacity = team.current;
+
+          for (let hireMonth = 0; hireMonth <= monthIndex; hireMonth += 1) {
+            const hires = team.hiresMonthly[hireMonth] || 0;
+            totalHeadcount += hires;
+            const trainingIndex = monthIndex - hireMonth;
+            const trainingRate = trainingCurve[trainingIndex] ?? 1;
+            effectiveCapacity += hires * trainingRate;
+          }
+
+          totalMonthlyHeadcount.push(totalHeadcount);
+          const proficiency = totalHeadcount === 0 ? 1 : effectiveCapacity / totalHeadcount;
+          proficiencyMonthly.push(proficiency);
+        }
+
+        return {
+          ...team,
+          totalMonthlyHeadcount,
+          proficiencyMonthly,
+        };
+      });
+    };
+
+    const updateQuarterSummary = (teams) => {
+      const totals = [0, 0, 0, 0];
+      const budgetTotals = [0, 0, 0, 0];
+      let yearEndTotal = 0;
+
+      teams.forEach((team) => {
+        team.growthByQuarter.forEach((value, index) => {
+          totals[index] += value;
+        });
+        team.budgetsByQuarter.forEach((value, index) => {
+          budgetTotals[index] += value;
+        });
+        const totalGrowth = team.growthByQuarter.reduce((sum, value) => sum + value, 0);
+        yearEndTotal += team.current + totalGrowth;
+      });
+
+      quarterlyGrowth.textContent = totals
+        .map((value, index) => `Q${index + 1}: ${formatNumber(value, 1)} hires`)
+        .join(" · ");
+      quarterlyBudget.textContent = budgetTotals
+        .map((value, index) => `Q${index + 1}: ${formatCurrency(value)}`)
+        .join(" · ");
+      yearEnd.textContent = `${formatNumber(yearEndTotal, 0)} total team members`; 
+    };
+
+    const updateMonthBalance = (monthSplit) => {
+      const quarterTotals = [0, 0, 0, 0];
+      monthSplit.forEach((month) => {
+        month.forEach((value, index) => {
+          quarterTotals[index] += value;
+        });
+      });
+      const allBalanced = quarterTotals.every((total) => Math.abs(total - 100) < 0.5);
+      quarterBalance.textContent = allBalanced
+        ? "All quarters balanced at 100%"
+        : `Quarter totals: ${quarterTotals.map((total) => `${formatNumber(total, 1)}%`).join(" | ")}`;
+      quarterBalance.className = allBalanced ? "badge" : "badge warning";
+    };
+
+    const renderMonthlyBudgetTable = (teams) => {
+      const header = `
+        <thead>
+          <tr>
+            <th>Team</th>
+            ${monthLabels.map((label) => `<th>${label}</th>`).join("")}
+            <th>Total</th>
+          </tr>
+        </thead>
+      `;
+
+      const bodyRows = teams.map((team) => {
+        const total = team.budgetMonthly.reduce((sum, value) => sum + value, 0);
+        return `
+          <tr>
+            <td>${team.name}</td>
+            ${team.budgetMonthly.map((value) => `<td>${formatCurrency(value)}</td>`).join("")}
+            <td><strong>${formatCurrency(total)}</strong></td>
+          </tr>
+        `;
+      });
+
+      monthlyBudgetTable.innerHTML = `${header}<tbody>${bodyRows.join("")}</tbody>`;
+    };
+
+    const getHeatClass = (value, threshold) => {
+      if (value < threshold) return "heat-low";
+      if (value < threshold + 0.1) return "heat-mid";
+      return "heat-high";
+    };
+
+    const renderProficiencyTable = (teams, threshold) => {
+      const header = `
+        <table>
+          <thead>
+            <tr>
+              <th>Team</th>
+              ${monthLabels.map((label) => `<th>${label}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      const bodyRows = teams.map((team) => {
+        const cells = team.proficiencyMonthly.map((value) => {
+          const className = getHeatClass(value, threshold);
+          return `<td class="${className}">${formatNumber(value * 100, 1)}%</td>`;
+        });
+        return `<tr><td>${team.name}</td>${cells.join("")}</tr>`;
+      });
+
+      proficiencyTable.innerHTML = `${header}${bodyRows.join("")}</tbody></table>`;
+    };
+
+    const renderChart = (teams) => {
+      const datasets = teams.map((team, index) => {
+        const colors = ["#2563eb", "#0f766e", "#d97706", "#9333ea", "#dc2626"];
+        return {
+          label: team.name,
+          data: team.proficiencyMonthly.map((value) => Math.round(value * 1000) / 10),
+          borderColor: colors[index % colors.length],
+          backgroundColor: "transparent",
+          tension: 0.3,
+        };
+      });
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(chartCanvas, {
+        type: "line",
+        data: {
+          labels: monthLabels,
+          datasets,
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: "bottom",
+            },
+          },
+          scales: {
+            y: {
+              min: 0,
+              max: 100,
+              title: {
+                display: true,
+                text: "Proficiency (%)",
+              },
+            },
+          },
+        },
+      });
+    };
+
+    const updateViewToggle = () => {
+      const isChart = viewToggle.value === "chart";
+      proficiencyTable.classList.toggle("hidden", isChart);
+      proficiencyChart.classList.toggle("hidden", !isChart);
+    };
+
+    const recompute = () => {
+      const teams = computeQuarterTotals(parseTeams());
+      updateQuarterSummary(teams);
+
+      const monthSplit = parseMonthSplit();
+      updateMonthBalance(monthSplit);
+      const monthlyTeams = computeMonthlyAllocations(teams, monthSplit);
+      renderMonthlyBudgetTable(monthlyTeams);
+
+      const trainingCurve = parseTrainingCurve();
+      const proficiencyTeams = computeProficiencyTimeline(monthlyTeams, trainingCurve);
+
+      const threshold = (Number(thresholdInput.value) || 0) / 100;
+      renderProficiencyTable(proficiencyTeams, threshold);
+      renderChart(proficiencyTeams);
+      updateViewToggle();
+    };
+
+    const bindInputs = () => {
+      document.querySelectorAll("input, select").forEach((input) => {
+        input.addEventListener("input", recompute);
+      });
+      viewToggle.addEventListener("change", updateViewToggle);
+    };
+
+    bindInputs();
+    recompute();
+  </script>
+</body>
+</html>
